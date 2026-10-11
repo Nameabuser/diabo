@@ -92,6 +92,11 @@
     b.addEventListener("click", function () { b.closest(".sheet").classList.add("hidden"); });
   });
 
+  document.getElementById("hist").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-del]");
+    if (b) window.Diabo.remove(b.getAttribute("data-del"));
+  });
+
   /* number pad */
   var padVal = "";
   var padTag = "";
