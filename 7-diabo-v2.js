@@ -207,10 +207,14 @@ var preference='auto';try{preference=localStorage.getItem('diabo-theme-v2')||'au
   input.addEventListener("change", function () {
     var f = input.files && input.files[0];
     if (!f) return;
+    numField.value = "";
+    confirmBox.classList.add("hidden");
     var url = URL.createObjectURL(f);
+    img.onerror = function () { status.classList.remove("hidden"); status.textContent = "Could not open this photo - type the number you see:"; numField.value = ""; confirmBox.classList.remove("hidden"); URL.revokeObjectURL(url); };
     img.onload = function () {
       img.classList.remove("hidden");
       confirmBox.classList.add("hidden");
+      numField.value = "";
       status.classList.remove("hidden");
       status.textContent = "Reading the number...";
       setTimeout(function () { analyze(img); }, 30);
