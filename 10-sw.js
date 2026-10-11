@@ -1,5 +1,5 @@
-const CACHE='diabo-offline-v14';
-const FILES=['./','./index.html','./8-theme-v2.css?v=5','./seg7.js?v=2','./7-diabo-v2.js?v=8','./1-9-sync.js?v=6','./manifest.webmanifest','./icons/1-apple-touch-icon.png'];
+const CACHE='diabo-offline-v15';
+const FILES=['./','./index.html','./8-theme-v2.css?v=6','./seg7.js?v=2','./7-diabo-v2.js?v=9','./1-9-sync.js?v=6','./manifest.webmanifest','./icons/1-apple-touch-icon.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)));self.skipWaiting();});
 self.addEventListener('activate',e=>e.waitUntil(Promise.all([self.clients.claim(),caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('diabo-offline-')&&k!==CACHE).map(k=>caches.delete(k))))])));
 self.addEventListener('fetch',e=>{if(e.request.method!=='GET'||new URL(e.request.url).origin!==self.location.origin)return;e.respondWith(fetch(e.request).then(r=>{if(r.ok){const copy=r.clone();caches.open(CACHE).then(c=>c.put(e.request,copy));}return r;}).catch(()=>caches.match(e.request).then(r=>r||(e.request.mode==='navigate'?caches.match('./index.html'):Response.error()))));});
