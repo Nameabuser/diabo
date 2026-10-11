@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Diabo">
+<meta name="theme-color" content="#0b0d12">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<title>Diabo</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div class="brand">
+    <svg class="drop" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C12 2 5 10.5 5 15.2C5 19.2 8.1 22 12 22C15.9 22 19 19.2 19 15.2C19 10.5 12 2 12 2Z" fill="#ff4757"/></svg>
+    <h1>Diabo</h1>
+  </div>
+</header>
+
+<main>
+  <section class="modes" id="modes">
+    <button class="mode" id="m-scan" type="button">
+      <span class="mode-ic">📷</span>
+      <span class="mode-tx">Scan meter</span>
+      <span class="mode-sub">photo of the screen</span>
+    </button>
+    <button class="mode" id="m-pad" type="button">
+      <span class="mode-ic">🔢</span>
+      <span class="mode-tx">Number pad</span>
+      <span class="mode-sub">type it, 2 taps</span>
+    </button>
+    <button class="mode" id="m-voice" type="button">
+      <span class="mode-ic">🎙️</span>
+      <span class="mode-tx">Voice</span>
+      <span class="mode-sub">say "137 before lunch"</span>
+    </button>
+  </section>
+
+  <section class="sheet hidden" id="sheet-pad">
+    <div class="sheet-head"><h2>Number pad</h2><button class="x" data-close type="button">✕</button></div>
+    <div class="tags" data-tags></div>
+    <div class="pad-out"><span id="pad-val">0</span><span class="unit">mg/dL</span></div>
+    <div class="pad" id="pad"></div>
+    <button class="save" id="pad-save" type="button">Save</button>
+  </section>
+
+  <section class="sheet hidden" id="sheet-scan">
+    <div class="sheet-head"><h2>Scan meter</h2><button class="x" data-close type="button">✕</button></div>
+    <p class="hint" id="scan-hint">Take a photo of the meter screen (or pick from library). The photo stays on your phone.</p>
+    <input type="file" id="scan-input" accept="image/*" class="hidden">
+    <button class="save ghost" id="scan-pick" type="button">Choose photo</button>
+    <div class="scan-status hidden" id="scan-status">Reading the number...</div>
+    <img id="scan-img" class="scan-img hidden" alt="meter photo">
+    <div class="confirm hidden" id="scan-confirm">
+      <label class="cf-label">I read this number - fix it if wrong:</label>
+      <input id="scan-num" class="cf-num" inputmode="numeric" pattern="[0-9]*">
+      <span class="unit">mg/dL</span>
+      <div class="tags" data-tags></div>
+      <button class="save" id="scan-save" type="button">Save reading</button>
+    </div>
+  </section>
+
+  <section class="sheet hidden" id="sheet-voice">
+    <div class="sheet-head"><h2>Voice</h2><button class="x" data-close type="button">✕</button></div>
+    <p class="hint" id="voice-hint">Say the number and when, like "137 before lunch" or "102 fasting".</p>
+    <button class="save ghost" id="voice-go" type="button">Start listening</button>
+    <div class="scan-status hidden" id="voice-status">Listening...</div>
+    <div class="confirm hidden" id="voice-confirm">
+      <label class="cf-label">I heard:</label>
+      <div class="voice-heard" id="voice-heard"></div>
+      <input id="voice-num" class="cf-num" inputmode="numeric" pattern="[0-9]*">
+      <span class="unit">mg/dL</span>
+      <div class="tags" data-tags></div>
+      <button class="save" id="voice-save" type="button">Save reading</button>
+    </div>
+  </section>
+
+  <section class="history">
+    <h2>History</h2>
+    <div id="hist-empty" class="hist-empty">No readings yet. Add your first one above.</div>
+    <ul id="hist"></ul>
+  </section>
+</main>
+
+<footer>Tracker only - not medical advice. Readings stay on this device.</footer>
+
+<script src="seg7.js" defer></script>
+<script src="app.js" defer></script>
+<script src="scan.js" defer></script>
+<script src="voice.js" defer></script>
+</body>
+</html>
