@@ -226,9 +226,49 @@
     return results[0];
   }
 
+  function components(ink,w,h) {
+    var seen=new Uint8Array(ink.length),out=[];
+    for(var i=0;i<ink.length;i++) {
+      if(!ink[i]||seen[i])continue;
+      var todo=[i],pts=[],x0=w,y0=h,x1=0,y1=0;seen[i]=1;
+      while(todo.length){var j=todo.pop(),x=j%w,y=(j/w)|0;pts.push(j);x0=Math.min(x0,x);x1=Math.max(x1,x);y0=Math.min(y0,y);y1=Math.max(y1,y);
+        for(var dy=-1;dy<=1;dy++)for(var dx=-1;dx<=1;dx++){var xx=x+dx,yy=y+dy,k=yy*w+xx;if(xx>=0&&xx<w&&yy>=0&&yy<h&&!seen[k]&&ink[k]){seen[k]=1;todo.push(k);}}
+      }
+      out.push({x:x0,y:y0,w:x1-x0+1,h:y1-y0+1,pts:pts});
+    }
+    return out;
+  }
+  function localInk(g,w,h,r,threshold){
+    // Integral box mean removes uneven LCD illumination without inventing segments.
+    var stride=w+1,sum=new Float64Array(stride*(h+1));
+    for(var y=0;y<h;y++){var row=0;for(var x=0;x<w;x++){row+=g[y*w+x];sum[(y+1)*stride+x+1]=sum[y*stride+x+1]+row;}}
+    var ink=new Uint8Array(g.length);
+    for(y=0;y<h;y++)for(x=0;x<w;x++){var x0=Math.max(0,x-r),x1=Math.min(w,x+r+1),y0=Math.max(0,y-r),y1=Math.min(h,y+r+1);var avg=(sum[y1*stride+x1]-sum[y0*stride+x1]-sum[y1*stride+x0]+sum[y0*stride+x0])/((x1-x0)*(y1-y0));ink[y*w+x]=avg-g[y*w+x]>threshold?1:0;}
+    return ink;
+  }
+  function adaptiveRows(g,w,h,r,threshold){
+    var ink=localInk(g,w,h,r,threshold),cs=components(ink,w,h),clean=new Uint8Array(g.length),scale=Math.max(w,h)/374;
+    // Reject the bezel, hand, text baseline and tiny memory/time segments.
+    cs.forEach(function(c){if(c.w>=2*scale&&c.w<=30*scale&&c.h>=10*scale&&c.h<=60*scale&&c.pts.length>=12*scale*scale&&c.pts.length/(c.w*c.h)>.18)c.pts.forEach(function(i){clean[i]=1;});});
+    var expanded=new Uint8Array(clean.length),gap=Math.max(2,Math.round(4*scale));
+    for(var i=0;i<clean.length;i++)if(clean[i]){var x=i%w,y=(i/w)|0;for(var yy=Math.max(0,y-gap);yy<=Math.min(h-1,y+gap);yy++)for(var xx=Math.max(0,x-gap);xx<=Math.min(w-1,x+gap);xx++)expanded[yy*w+xx]=1;}
+    var groups=components(expanded,w,h),results=[];
+    groups.forEach(function(c){if(c.w<35*scale||c.w>120*scale||c.h<25*scale||c.h>70*scale)return;var pad=Math.round(5*scale),sw=c.w+pad*2,sh=c.h+pad*2,sub=new Uint8Array(sw*sh);for(var yy=0;yy<c.h;yy++)for(var xx=0;xx<c.w;xx++)sub[(yy+pad)*sw+xx+pad]=clean[(yy+c.y)*w+xx+c.x];var d=detect(sub,sw,sh);if(/^[0-9]{2,3}$/.test(d.out)&&d.valid===d.out.length&&d.maxScore<=1.15&&d.minMargin>=.6)results.push({out:d.out,height:c.h,score:d.maxScore});});
+    results.sort(function(a,b){return b.height-a.height;});
+    if(!results.length)return null;
+    // Competing similarly sized readings are not a reason to guess.
+    for(i=1;i<results.length;i++)if(results[i].height>=results[0].height*.7&&results[i].out!==results[0].out)return null;
+    return results[0];
+  }
+  function readAdaptive(grab,fw,fh){
+    var votes={},angs=[-4,0,4],radii=[6,10,14,20],thresholds=[5,9,13],scale=Math.max(fw,fh)/374;
+    for(var ai=0;ai<angs.length;ai++) {var source=grab(fw,fh,angs[ai]), factor=Math.min(1,374/Math.max(fw,fh)),w=Math.round(fw*factor),h=Math.round(fh*factor),g=new Uint8Array(w*h);for(var yy=0;yy<h;yy++)for(var xx=0;xx<w;xx++)g[yy*w+xx]=source[Math.min(fh-1,Math.round(yy/factor))*fw+Math.min(fw-1,Math.round(xx/factor))];scale=Math.max(w,h)/374;for(var ri=0;ri<radii.length;ri++)for(var ti=0;ti<thresholds.length;ti++){var r=adaptiveRows(g,w,h,Math.max(3,Math.round(radii[ri]*scale)),thresholds[ti]);if(r){var v=votes[r.out]||(votes[r.out]={count:0,angles:{},thresholds:{}});v.count++;v.angles[ai]=true;v.thresholds[ti]=true;}}}
+    var keys=Object.keys(votes).sort(function(a,b){return votes[b].count-votes[a].count;});if(!keys.length)return "";var v=votes[keys[0]],total=0;keys.forEach(function(k){total+=votes[k].count;});if(v.count/total<.85)return "";for(var ki=1;ki<keys.length;ki++)if(votes[keys[ki]].count>=2)return "";return v.count>=4&&Object.keys(v.angles).length>=2&&Object.keys(v.thresholds).length>=2?keys[0]:"";
+  }
+
   /* Conservative consensus: a valid glucose value is not proof of a valid read.
      Never return partial digits or a single lucky crop. Uncertain photos stay blank. */
-  function read(grab, fw, fh) {
+  function readLegacy(grab, fw, fh) {
     var votes = {}, candidates = [], fracs = [1, .75, .55, .4], angs = [-2, -.5, 0, .5, 2];
     for (var fi = 0; fi < fracs.length; fi++) {
       var cw = Math.max(1, (fw * fracs[fi]) | 0), ch = Math.max(1, (fh * fracs[fi]) | 0);
@@ -249,5 +289,6 @@
     var v = votes[keys[0]];
     return v.count >= 4 && Object.keys(v.crops).length >= 2 ? keys[0] : "";
   }
-  return { read: read, runDetect: runDetect, detect: detect, otsu: otsu };
+  function read(grab,fw,fh){var a=readAdaptive(grab,fw,fh),b=readLegacy(grab,fw,fh);return a&&b&&a!==b?"":a||b;}
+  return { read: read, readAdaptive: readAdaptive, runDetect: runDetect, detect: detect, otsu: otsu };
 });
