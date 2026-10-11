@@ -21,9 +21,12 @@
         return Array.isArray(r) ? r : [];
       } catch (e) { return []; }
     },
-    save: function (value, tag) {
+    save: function (value, tag, timestamp) {
+      var ts = timestamp === undefined ? Date.now() : timestamp;
+      if (!Number.isSafeInteger(ts) || ts <= 0 || ts > Date.now()) return false;
       var list = window.Diabo.load();
-      list.unshift({ id: Date.now() + "-" + Math.floor(Math.random() * 1e6), value: value, tag: tag || "", ts: Date.now() });
+      list.unshift({ id: Date.now() + "-" + Math.floor(Math.random() * 1e6), value: value, tag: tag || "", ts: ts });
+      list.sort(function(a,b) { return b.ts-a.ts; });
       try { localStorage.setItem(KEY, JSON.stringify(list)); } catch (e) { window.dispatchEvent(new CustomEvent("diabo-error")); return false; }
       renderHistory();
       window.dispatchEvent(new CustomEvent("diabo-saved"));
@@ -109,6 +112,18 @@
   }
   window.Diabo.fillTags = fillTags;
 
+  /* The date draft is for manual entry only. Siri/API saves still default to now. */
+  var readingDay='',readingTime='',dateEdited=false;
+  function localDate(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+  function localTime(d){return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+  function syncDateFields(){var now=new Date(),today=localDate(now),yesterday=localDate(new Date(now.getFullYear(),now.getMonth(),now.getDate()-1));document.querySelectorAll('[data-reading-date]').forEach(function(e){e.value=readingDay;e.max=today;e.min='1970-01-02';});document.querySelectorAll('[data-reading-time]').forEach(function(e){e.value=readingTime;});document.querySelectorAll('[data-reading-day]').forEach(function(e){e.setAttribute('aria-pressed',String(readingDay===(e.dataset.readingDay==='today'?today:yesterday)));});document.querySelectorAll('[data-date-error]').forEach(function(e){e.classList.add('hidden');});}
+  window.Diabo.resetReadingDate=function(){var n=new Date();readingDay=localDate(n);readingTime=localTime(n);dateEdited=false;syncDateFields();};
+  document.querySelectorAll('[data-reading-date]').forEach(function(e){e.addEventListener('change',function(){readingDay=e.value;dateEdited=true;syncDateFields();});});
+  document.querySelectorAll('[data-reading-time]').forEach(function(e){e.addEventListener('change',function(){readingTime=e.value;dateEdited=true;syncDateFields();});});
+  document.querySelectorAll('[data-reading-day]').forEach(function(e){e.addEventListener('click',function(){var n=new Date();readingDay=localDate(new Date(n.getFullYear(),n.getMonth(),n.getDate()-(e.dataset.readingDay==='yesterday'?1:0)));dateEdited=true;syncDateFields();});});
+  window.Diabo.saveReading=function(value,tag){var now=new Date(),ts=+now,d;if(dateEdited){d=new Date(readingDay+'T'+readingTime+':00');ts=d.getTime();}if(!readingDay||!readingTime||!Number.isSafeInteger(ts)||ts<=0||ts>+now||dateEdited&&(localDate(d)!==readingDay||localTime(d)!==readingTime)){document.querySelectorAll('.sheet:not(.hidden) [data-date-error]').forEach(function(e){e.textContent='Choose a valid date and time, not in the future.';e.classList.remove('hidden');e.scrollIntoView({block:'nearest'});});return false;}return window.Diabo.save(value,tag,ts);};
+  window.Diabo.resetReadingDate();
+
   /* sheet switching */
   var sheets = { "m-scan": "sheet-scan", "m-pad": "sheet-pad", "m-voice": "sheet-voice" };
   Object.keys(sheets).forEach(function (btnId) {
@@ -151,7 +166,7 @@
       document.getElementById("pad-error").classList.remove("hidden");
       return;
     }
-    if (window.Diabo.save(+padVal, padTag) === false) return;
+    if (window.Diabo.saveReading(+padVal, padTag) === false) return;
     document.getElementById("pad-error").classList.add("hidden");
     padVal = "";
     document.getElementById("pad-val").textContent = "0";
@@ -175,7 +190,7 @@ el('today-average').textContent=today.length?Math.round(today.reduce(function(s,
 if(window.DiaboInsights)window.DiaboInsights.render();
 Array.prototype.forEach.call(document.querySelectorAll('#hist li'),function(li,index){var r=list[index];if(r){li.querySelector('.hv').className='hv '+tone(r.value);li.querySelector('[data-del]').setAttribute('aria-label','Delete '+r.value+' reading');}});
 }
-el('add-reading').addEventListener('click',function(){document.querySelectorAll('.sheet').forEach(function(s){s.classList.add('hidden');});el('sheet-methods').classList.remove('hidden');el('m-pad').focus();});
+el('add-reading').addEventListener('click',function(){D.resetReadingDate();document.querySelectorAll('.sheet').forEach(function(s){s.classList.add('hidden');});el('sheet-methods').classList.remove('hidden');el('m-pad').focus();});
 document.addEventListener('keydown',function(e){if(e.key==='Escape'){document.querySelectorAll('.sheet').forEach(function(s){s.classList.add('hidden');});el('add-reading').focus();}});
 window.addEventListener('diabo-render',render);window.addEventListener('diabo-saved',function(){notify('Reading saved',false);el('add-reading').focus();});window.addEventListener('diabo-error',function(){notify('Storage is full or unavailable. Reading was not changed.',false);});window.addEventListener('diabo-deleted',function(e){deleted=e.detail;notify('Reading deleted',true);});el('undo').addEventListener('click',function(){if(deleted){D.restore(deleted);deleted=null;notify('Reading restored',false);}});
 var startX=0,startY=0;el('hist').addEventListener('touchstart',function(e){startX=e.changedTouches[0].clientX;startY=e.changedTouches[0].clientY;},{passive:true});el('hist').addEventListener('touchend',function(e){var t=e.changedTouches[0];if(startX-t.clientX>85&&Math.abs(startY-t.clientY)<35){var row=e.target.closest('li');if(row)D.remove(row.querySelector('[data-del]').getAttribute('data-del'));}},{passive:true});
@@ -254,7 +269,7 @@ var preference='auto';try{preference=localStorage.getItem('diabo-theme-v2')||'au
   saveBtn.addEventListener("click", function () {
     var v = numField.value.trim();
     if (!window.Diabo.valid(v)) { numField.focus(); return; }
-    if (window.Diabo.save(+v, scanTag) === false) return;
+    if (window.Diabo.saveReading(+v, scanTag) === false) return;
     numField.value = "";
     tagCtl.set("");
     img.classList.add("hidden");
@@ -337,7 +352,7 @@ var preference='auto';try{preference=localStorage.getItem('diabo-theme-v2')||'au
   saveBtn.addEventListener("click", function () {
     var v = numField.value.trim();
     if (!window.Diabo.valid(v)) { numField.focus(); return; }
-    if (window.Diabo.save(+v, voiceTag) === false) return;
+    if (window.Diabo.saveReading(+v, voiceTag) === false) return;
     numField.value = "";
     heard.textContent = "";
     tagCtl.set("");
