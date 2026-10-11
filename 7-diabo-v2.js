@@ -5,6 +5,7 @@
   var TAGS = ["fasting", "before meal", "after meal"];
   function baseTag(tag){return String(tag||"").split("|date=")[0];}
   function readingDate(r){var m=/\|date=(\d{4}-\d{2}-\d{2})$/.exec(String(r.tag||""));return m?m[1]:"";}
+  function readingOrder(a,b){var ad=readingDate(a),bd=readingDate(b),at=ad?new Date(ad+'T00:00:00').getTime():a.ts,bt=bd?new Date(bd+'T00:00:00').getTime():b.ts;return bt-at||Number(String(b.id).split('-')[0])-Number(String(a.id).split('-')[0])||String(b.id).localeCompare(String(a.id));}
   function tagLabel(tag) {
     tag=baseTag(tag);
     return { fasting: "Morning", "before meal": "Afternoon", "after meal": "Evening",
@@ -21,7 +22,7 @@
     load: function () {
       try {
         var r = JSON.parse(localStorage.getItem(KEY) || "[]");
-        return Array.isArray(r) ? r : [];
+        return Array.isArray(r) ? r.slice().sort(readingOrder) : [];
       } catch (e) { return []; }
     },
     save: function (value, tag, timestamp) {
@@ -29,7 +30,7 @@
       if (!Number.isSafeInteger(ts) || ts <= 0 || ts > Date.now()) return false;
       var list = window.Diabo.load();
       list.unshift({ id: Date.now() + "-" + Math.floor(Math.random() * 1e6), value: value, tag: tag || "", ts: ts });
-      list.sort(function(a,b) { return b.ts-a.ts; });
+      list.sort(readingOrder);
       try { localStorage.setItem(KEY, JSON.stringify(list)); } catch (e) { window.dispatchEvent(new CustomEvent("diabo-error")); return false; }
       renderHistory();
       window.dispatchEvent(new CustomEvent("diabo-saved"));
@@ -46,7 +47,7 @@
     restore: function (reading) {
       var list = window.Diabo.load();
       if (!reading || list.some(function(r) { return r.id === reading.id; })) return;
-      list.push(reading); list.sort(function(a,b) { return b.ts-a.ts; });
+      list.push(reading); list.sort(readingOrder);
       try { localStorage.setItem(KEY, JSON.stringify(list)); } catch(e) { window.dispatchEvent(new CustomEvent("diabo-error")); return; }
       renderHistory();
     },
@@ -58,7 +59,7 @@
   };
 
   window.Diabo.tagLabel = tagLabel;
-  window.Diabo.baseTag=baseTag;window.Diabo.readingDate=readingDate;
+  window.Diabo.baseTag=baseTag;window.Diabo.readingDate=readingDate;window.Diabo.readingOrder=readingOrder;
   window.Diabo.parseTag = parseTag;
 
   function esc(s) {
@@ -93,7 +94,7 @@
       b.textContent = tagLabel(t);
       b.setAttribute("data-tag", t);
       b.addEventListener("click", function () {
-        pickTag(cur === t ? "" : t);
+        pickTag(t);
       });
       container.appendChild(b);
     });
@@ -171,7 +172,7 @@ D.ranges=ranges;D.rangeFor=rangeFor;
 function tone(reading){var r=rangeFor(reading);return !r?'':reading.value<r.low?'below':reading.value>r.high?'above':'within';}
 function status(reading){var r=rangeFor(reading);return !r?'':reading.value<r.low?' · Below your range':reading.value>r.high?' · Above your range':' · Within your range';}
 function render(){
-var list=D.load().slice().sort(function(a,b){return b.ts-a.ts;}), now=new Date(), today=list.filter(function(r){return (D.readingDate(r)?new Date(D.readingDate(r)+'T00:00:00'):new Date(r.ts)).toDateString()===now.toDateString();});
+var list=D.load().slice().sort(D.readingOrder), now=new Date(), today=list.filter(function(r){return (D.readingDate(r)?new Date(D.readingDate(r)+'T00:00:00'):new Date(r.ts)).toDateString()===now.toDateString();});
 el('delete-latest').classList.toggle('hidden',!list.length);
 el('last-value').textContent=list.length?list[0].value:'--';el('last-value').className='stat-number '+(list.length?tone(list[0]):'');
 el('last-detail').textContent=list.length?(D.readingDate(list[0])?new Date(D.readingDate(list[0])+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'}):new Date(list[0].ts).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}))+(D.baseTag(list[0].tag)?' · '+D.tagLabel(list[0].tag):'')+status(list[0]):'Your first reading starts here';
@@ -181,8 +182,8 @@ if(window.DiaboInsights)window.DiaboInsights.render();
 }
 el('add-reading').addEventListener('click',function(){D.resetReadingDate();document.querySelectorAll('.sheet').forEach(function(s){s.classList.add('hidden');});el('sheet-methods').classList.remove('hidden');el('m-pad').focus();});
 document.addEventListener('keydown',function(e){if(e.key==='Escape'){document.querySelectorAll('.sheet').forEach(function(s){s.classList.add('hidden');});el('add-reading').focus();}});
-el('delete-latest').addEventListener('click',function(){var r=D.load().slice().sort(function(a,b){return b.ts-a.ts;})[0];if(!r)return;D.remove(r.id);});
-window.addEventListener('diabo-render',render);window.addEventListener('diabo-saved',function(){notify('Reading saved',false);el('add-reading').focus();});window.addEventListener('diabo-error',function(){notify('Storage is full or unavailable. Reading was not changed.',false);});window.addEventListener('diabo-deleted',function(e){deleted=e.detail;notify('Reading deleted',true);});el('undo').addEventListener('click',function(){if(deleted){D.restore(deleted);deleted=null;notify('Reading restored',false);}});
+el('delete-latest').addEventListener('click',function(){var r=D.load().slice().sort(D.readingOrder)[0];if(!r)return;D.remove(r.id);});
+window.addEventListener('diabo-render',render);window.addEventListener('diabo-saved',function(){el('add-reading').focus();});window.addEventListener('diabo-error',function(){notify('Storage is full or unavailable. Reading was not changed.',false);});window.addEventListener('diabo-deleted',function(e){deleted=e.detail;notify('Reading deleted',true);});el('undo').addEventListener('click',function(){if(deleted){D.restore(deleted);deleted=null;notify('Reading restored',false);}});
 
 el('range-form').addEventListener('submit',function(e){e.preventDefault();var all={},bad=false;[['morning','range-low','range-high'],['other','range-other-low','range-other-high']].forEach(function(a){var low=el(a[1]).value,high=el(a[2]).value;if(!low&&!high)return;var r={low:Number(low),high:Number(high)};if(!low||!high||!validRange(r)){bad=true;return;}all[a[0]]=r;});if(bad){el('range-status').textContent='Enter both values from 20 to 600 for each range, with lower below upper. Leave both blank to skip a range.';return;}try{localStorage.setItem('diabo-ranges-v3',JSON.stringify(all));localStorage.removeItem('diabo-range-v2');}catch(e){notify('Could not save your ranges.',false);return;}el('range-status').textContent='Saved. Ranges follow the reading tag.';render();});el('range-clear').addEventListener('click',function(){localStorage.removeItem('diabo-range-v2');localStorage.setItem('diabo-ranges-v3','{}');['range-low','range-high','range-other-low','range-other-high'].forEach(function(id){el(id).value='';});el('range-status').textContent='No target ranges set. Readings use a neutral colour.';render();});var saved=ranges();[['morning','range-low','range-high'],['other','range-other-low','range-other-high']].forEach(function(a){var r=saved[a[0]];if(validRange(r)){el(a[1]).value=r.low;el(a[2]).value=r.high;}});
 var preference='auto';try{preference=localStorage.getItem('diabo-theme-v2')||'auto';}catch(e){}var media=window.matchMedia('(prefers-color-scheme: light)');function theme(){var light=preference==='light'||(preference==='auto'&&media.matches);document.body.classList.toggle('light',light);el('theme-toggle').setAttribute('aria-label',light?'Switch to dark theme':'Switch to light theme');document.documentElement.classList.toggle('light-ready',light);document.querySelector('meta[name="theme-color"]').content=light?'#fafafa':'#151515';}el('theme-toggle').addEventListener('click',function(){preference=document.body.classList.contains('light')?'dark':'light';try{localStorage.setItem('diabo-theme-v2',preference);}catch(e){}theme();});if(media.addEventListener)media.addEventListener('change',theme);theme();render();
