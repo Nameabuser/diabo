@@ -22,3 +22,6 @@
 html{overflow-y:auto;scroll-behavior:auto;scrollbar-width:none}body{overflow:visible;scroll-behavior:auto}html::-webkit-scrollbar,body::-webkit-scrollbar,.sheet::-webkit-scrollbar{display:none;width:0;height:0}.sheet{scrollbar-width:none;-webkit-overflow-scrolling:touch}
 
 .long-averages{gap:12px;padding:18px 20px}.long-averages .average-note{font-size:10px;line-height:1.5}
+
+/* Top-card value typography exchanged; spacing and colours unchanged. */
+.overview #last-value{font-size:35px;font-weight:600;line-height:1.4;letter-spacing:normal;font-variant-numeric:normal}.overview #today-average{font-size:54px;font-weight:700;line-height:1.2;letter-spacing:-2px;font-variant-numeric:tabular-nums}@media(max-width:350px){.overview #today-average{font-size:46px}}
