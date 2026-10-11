@@ -119,18 +119,18 @@
       for (var y = Math.max(0, ya); y < Math.min(hh, yb); y++) { var base = y * w; for (var x = Math.max(0, xa); x < Math.min(w, xb); x++) { tot++; hit += ink[base + x]; } }
       return tot ? hit / tot : 0;
     }
-    var ds = [dens(.25,.75,.02,.12), dens(.82,.98,.14,.42), dens(.82,.98,.58,.86), dens(.25,.75,.88,.98), dens(.02,.18,.58,.86), dens(.02,.18,.14,.42), dens(.25,.75,.44,.56)];
+    var ds = [dens(.25,.75,0,.08), dens(.88,1,.14,.42), dens(.88,1,.58,.86), dens(.25,.75,.92,1), dens(0,.12,.58,.86), dens(0,.12,.14,.42), dens(.25,.75,.46,.54)];
     var tot = 0, hit = 0;
     for (var y = Math.max(0, y0 | 0); y < Math.min(hh, y1 | 0); y++) { var base = y * w; for (var x = Math.max(0, x0 | 0); x < Math.min(w, x1 | 0); x++) { tot++; hit += ink[base + x]; } }
     var fill = tot ? hit / tot : 0;
     if (fill > 0.68 || fill < 0.08) return [null, 9];
-    var bestD = null, bestS = 9;
+    var bestD = null, bestS = 9, secondS = 9;
     for (var dig in PATS) {
       var p = PATS[dig], s = 0;
       for (var i = 0; i < 7; i++) s += p[i] ? (1 - ds[i]) : ds[i];
-      if (s < bestS) { bestS = s; bestD = dig; }
+      if (s < bestS) { secondS = bestS; bestS = s; bestD = dig; } else if (s < secondS) secondS = s;
     }
-    return [bestD, bestS];
+    return [bestD, bestS, secondS - bestS];
   }
   function detect(ink0, w, h) {
     var ink = ink0.slice();
@@ -155,16 +155,19 @@
         var c2 = cands[j];
         if (Math.abs((c2[2] + c2[3]) / 2 - cy) < c[4] * 0.5 && c2[4] / c[4] > 0.55 && c2[4] / c[4] < 1.8) { row.push(c2); used[j] = 1; }
       }
-      var score = row.length * 5;
-      for (j = 0; j < row.length; j++) score += row[j][4] / h;
+      /* Large main digits, never the longer/smaller clock or memory row. */
+      if (row.length < 2 || row.length > 3) continue;
+      var score = c[4] / h;
+      for (j = 0; j < row.length; j++) score += row[j][4] / h / 100;
       if (!bestRow || score > bestRow.score) bestRow = { score: score, row: row };
     }
+    if (!bestRow) return { out: "", valid: 0, ssum: 9 };
     var rowC = bestRow.row;
     var ry0 = 1e9, ry1 = 0, rx0 = 1e9, rx1 = 0;
     for (i = 0; i < rowC.length; i++) { ry0 = Math.min(ry0, rowC[i][2]); ry1 = Math.max(ry1, rowC[i][3]); rx0 = Math.min(rx0, rowC[i][0]); rx1 = Math.max(rx1, rowC[i][1]); }
     var bandH = ry1 - ry0, est = bandH / 1.9;
     var cs = colsumBand(ink, w, Math.max(0, ry0 - ((bandH * 0.15) | 0)), Math.min(h, ry1 + ((bandH * 0.15) | 0)));
-    var cth = Math.max(2, (bandH * 0.06) | 0);
+    var cth = Math.max(1, (bandH * 0.02) | 0);
     runs = mergeRuns(runsFrom(cs, cth), est * 0.12);
     var cells = [];
     for (i = 0; i < runs.length; i++) {
@@ -172,7 +175,7 @@
       if (runs[i][1] - runs[i][0] < bandH * 0.06) continue;
       cells = cells.concat(splitWide(cs, runs[i][0], runs[i][1], est, cth));
     }
-    var out = "", valid = 0, ssum = 0;
+    var out = "", valid = 0, ssum = 0, maxScore = 0, minMargin = 9;
     for (i = 0; i < cells.length; i++) {
       var x0 = cells[i][0], x1 = cells[i][1];
       ext = yextent(ink, w, h, x0, x1);
@@ -184,42 +187,67 @@
         var r2 = decode(ink, w, h, Math.max(0, (x1 - bw2) | 0), x1, y0, y1);
         var r3 = decode(ink, w, h, x0, Math.min(w, (x0 + bw2) | 0), y0, y1);
         var opts = [];
-        if (d) opts.push([sc + 0.6, d]);
-        if (r2[0]) opts.push([r2[1], r2[0]]);
-        if (r3[0]) opts.push([r3[1], r3[0]]);
-        if (opts.length) { opts.sort(function (a, b) { return a[0] - b[0]; }); sc = opts[0][0]; d = opts[0][1]; }
+        if (d) opts.push([sc + 0.6, d, r[2] || 0]);
+        if (r2[0]) opts.push([r2[1], r2[0], r2[2] || 0]);
+        if (r3[0]) opts.push([r3[1], r3[0], r3[2] || 0]);
+        if (opts.length) { opts.sort(function (a, b) { return a[0] - b[0]; }); sc = opts[0][0]; d = opts[0][1]; r[2] = opts[0][2]; }
       }
-      if (d && sc < 3.0) { out += d; valid++; ssum += sc; } else { out += "?"; ssum += 3; }
+      maxScore = Math.max(maxScore, sc); minMargin = Math.min(minMargin, r[2] || 0);
+      if (d && sc < 1.15 && (r[2] || 0) >= 0.45) { out += d; valid++; ssum += sc; } else { out += "?"; ssum += 3; }
     }
-    return { out: out, valid: valid, ssum: ssum };
+    return { out: out, valid: valid, ssum: ssum, maxScore: maxScore, minMargin: minMargin, height: bandH / h, cells: cells.length };
   }
   function runDetect(g, w, h) {
     var thr = otsu(g), results = [], dark, ink, i, r;
     for (dark = 1; dark >= 0; dark--) {
       ink = new Uint8Array(g.length);
-      for (i = 0; i < g.length; i++) ink[i] = ((g[i] < thr) === !!dark) ? 1 : 0;
-      r = detect(ink, w, h);
+      for (i = 0; i < g.length; i++) ink[i] = ((g[i] <= thr) === !!dark) ? 1 : 0;
+      // Separate LCD rows before column grouping so memory/time cannot join main digits.
+      var clean = ink.slice(); removeBorderInk(clean, w, h); filterComponents(clean, w, h);
+      var ys = new Int32Array(h);
+      for (var yy = 0; yy < h; yy++) for (var xx = 0; xx < w; xx++) ys[yy] += clean[yy * w + xx];
+      var bands = mergeRuns(runsFrom(ys, Math.max(2, w * .004)), Math.max(3, h * .025));
+      bands.sort(function(a,b){ return (b[1]-b[0])-(a[1]-a[0]); });
+      r = { out: "", valid: 0, ssum: 9 };
+      for (var bi = 0; bi < bands.length; bi++) {
+        var band = bands[bi], bh = band[1] - band[0];
+        if (bh < h * .14) continue;
+        // Once a large row is found, never substitute a smaller clock/memory row.
+        if (bi && bh < (bands[0][1] - bands[0][0]) * .7) break;
+        var pad = Math.max(3, Math.round(bh * .12)), hh = bh + pad * 2, sub = new Uint8Array(w * hh);
+        for (yy = 0; yy < bh; yy++) sub.set(clean.subarray((band[0]+yy)*w,(band[0]+yy+1)*w),(yy+pad)*w);
+        var trial = detect(sub, w, hh); trial.height = bh / h;
+        if (trial.valid > r.valid || (trial.valid === r.valid && trial.ssum < r.ssum)) r = trial;
+      }
       var qm = (r.out.split("?").length - 1);
-      results.push({ valid: r.valid, negq: -qm, negS: -r.ssum, out: r.out });
+      results.push({ valid: r.valid, negq: -qm, negS: -r.ssum, out: r.out, height: r.height || 0, maxScore: r.maxScore || 9, minMargin: r.minMargin || 0 });
     }
     results.sort(function (a, b) { return b.valid - a.valid || b.negq - a.negq || b.negS - a.negS; });
     return results[0];
   }
 
-  /* read(grab, fw, fh): grab(cw,ch,angDeg) -> Uint8Array gray. Returns digit string or "". */
+  /* Conservative consensus: a valid glucose value is not proof of a valid read.
+     Never return partial digits or a single lucky crop. Uncertain photos stay blank. */
   function read(grab, fw, fh) {
-    var best = { valid: 0, negq: -99, negS: -99, out: "" };
-    var fracs = [1.0, 0.75, 0.55, 0.4], angs = [-8, -4, 0, 4, 8];
+    var votes = {}, candidates = [], fracs = [1, .75, .55, .4], angs = [-2, -.5, 0, .5, 2];
     for (var fi = 0; fi < fracs.length; fi++) {
       var cw = Math.max(1, (fw * fracs[fi]) | 0), ch = Math.max(1, (fh * fracs[fi]) | 0);
       for (var ai = 0; ai < angs.length; ai++) {
-        var g = grab(cw, ch, angs[ai]);
-        var r = runDetect(g, cw, ch);
-        if (r.valid > best.valid || (r.valid === best.valid && (r.negq > best.negq || (r.negq === best.negq && r.negS > best.negS)))) best = r;
-        if (r.valid >= 2 && r.negq === 0 && -r.negS / r.valid < 1.0) return best.out;
+        var pixels = grab(cw, ch, angs[ai]), bright = 0;
+        for (var gi = 0; gi < pixels.length; gi++) if (pixels[gi] >= 250) bright++;
+        // Clipped highlights can erase a leading digit. Do not infer through glare.
+        if (bright / pixels.length > .005) continue;
+        var r = runDetect(pixels, cw, ch);
+        if (!/^[0-9]{2,3}$/.test(r.out) || r.negq !== 0 || r.valid !== r.out.length || r.maxScore > .95 || r.minMargin < .55 || r.height < .16) continue;
+        candidates.push(r.out);
+        var v = votes[r.out] || (votes[r.out] = { count: 0, crops: {} });
+        v.count++; v.crops[fi] = true;
       }
     }
-    return best.valid > 0 ? best.out : "";
+    var keys = Object.keys(votes);
+    if (keys.length !== 1) return "";
+    var v = votes[keys[0]];
+    return v.count >= 4 && Object.keys(v.crops).length >= 2 ? keys[0] : "";
   }
   return { read: read, runDetect: runDetect, detect: detect, otsu: otsu };
 });
