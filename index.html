@@ -8,6 +8,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="Diabo">
 <meta name="theme-color" content="#0e1b1a">
+<style>html{background:#000}html.owner-ready{background:#0e1b1a}html.owner-ready.light-ready{background:#f5f8f4}html.owner-ready body.app-locked{background:#0e1b1a!important}html.owner-ready.light-ready body.app-locked{background:#f5f8f4!important}html.owner-ready body.app-locked>header,html.owner-ready body.app-locked>main,html.owner-ready body.app-locked>footer{display:block!important}html.owner-ready #app-gate{display:none!important}html.light-ready body.app-locked{--bg:#f5f8f4;--panel:#fff;--ink:#19382f;--muted:#526c60;--line:#cfddd5;--accent:#267c65;--accentInk:#fff;--danger:#b92f48;--warn:#84600a;--shadow:0 18px 70px #244b3920;color-scheme:light}</style>
+<script>try{var r=document.documentElement,p=localStorage.getItem('diabo-theme-v2')||'auto',l=p==='light'||(p==='auto'&&matchMedia('(prefers-color-scheme: light)').matches);r.classList.toggle('light-ready',l);if(localStorage.getItem('diabo-owner-device-v1')==='yes'){r.classList.add('owner-ready');document.querySelector('meta[name="theme-color"]').content=l?'#f5f8f4':'#0e1b1a';}}catch(e){}</script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/1-apple-touch-icon.png">
 <link rel="icon" type="image/png" href="icons/2-icon-192.png">
@@ -21,7 +23,8 @@ body.app-locked{background:#000!important}body.app-locked>header,body.app-locked
 #app-gate{box-sizing:border-box}#gate-open{cursor:pointer}#gate-open:focus-visible{outline:2px solid #85dec9;outline-offset:8px}.gate-caption{color:#858f8c;font-size:13px;margin-top:26px;letter-spacing:.3px}.gate-stack{text-align:center;display:flex;flex-direction:column;align-items:center}#app-gate #gate-open{border:1px solid #1d3027;border-radius:32px;padding:18px;background:radial-gradient(circle at 50% 25%,#13251c,#060c09);box-shadow:0 0 60px #43806514}.lock-label{font-size:15px;color:#c0d9cf;margin-top:11px}@media(prefers-reduced-motion:reduce){#gate-open,.wordmark{animation:none!important}}#app-gate.unlocking .lock-shackle{transform-origin:80px 51px;animation:unlock-shackle .8s cubic-bezier(.2,.8,.2,1) forwards}#app-gate.unlocking .lock-trigger{animation:unlock-glow .8s ease-out forwards}#app-gate.unlocking #gate-form{display:none!important}#app-gate.unlocking #gate-open{display:block!important}#app-gate.unlocking .lock-label{color:#89dcc3}@keyframes unlock-shackle{to{transform:translateY(-10px) rotate(-30deg)}}@keyframes unlock-glow{to{box-shadow:0 0 60px #43806540;border-color:#438065}}@media(prefers-reduced-motion:reduce){#app-gate.unlocking .lock-shackle,#app-gate.unlocking .lock-trigger{animation:none!important}}body.auth-pending #app-gate{visibility:hidden!important}body.owner-device #app-gate{display:none!important}</style>
 </head>
 <body class="app-locked auth-pending">
-<script>try{if(localStorage.getItem('diabo-owner-device-v1')==='yes'){document.body.classList.remove('app-locked');document.body.classList.remove('auth-pending');document.body.classList.add('owner-device');}}catch(e){}</script>
+<script>if(document.documentElement.classList.contains('owner-ready')){document.body.classList.remove('app-locked','auth-pending');document.body.classList.add('owner-device');}document.body.classList.toggle('light',document.documentElement.classList.contains('light-ready'));</script>
+
 <section id="app-gate" aria-label="Sign in"><div id="gate-stack" class="gate-stack"><button id="gate-open" aria-label="Sign in" class="lock-trigger"><svg viewBox="0 0 120 120" width="108" height="108" fill="none" aria-hidden="true"><rect x="25" y="51" width="70" height="57" rx="18" stroke="#b8e7d9" stroke-width="3" fill="#0e1814"/><path class="lock-shackle" d="M40 51V33a20 20 0 0 1 40 0v18" stroke="#b8e7d9" stroke-width="3" stroke-linecap="round"/><circle cx="60" cy="76" r="5" fill="#79cdb4"/><path d="M60 80v10" stroke="#79cdb4" stroke-width="3" stroke-linecap="round"/></svg></button><div class="gate-caption">Welcome back</div><div class="lock-label">Tap to unlock</div></div><form id="gate-form" class="hidden"><label>Email<input id="gate-email" type="email" autocomplete="username" required></label><label>Password<input id="gate-password" type="password" autocomplete="current-password" required></label><button type="submit">Sign in</button><p id="gate-status" role="status"></p></form></section>
 <header>
   <div class="brand">
@@ -140,6 +143,6 @@ say('Saved '+(+val)+(tag?' · '+window.Diabo.tagLabel(tag):''));
 });
 })();
 </script>
-<script src="1-9-sync.js?v=5" defer></script>
+<script src="1-9-sync.js?v=6" defer></script>
 </body>
 </html>
