@@ -172,10 +172,7 @@ var list=D.load().slice().sort(function(a,b){return b.ts-a.ts;}), now=new Date()
 el('last-value').textContent=list.length?list[0].value:'--';el('last-value').className='stat-number '+(list.length?tone(list[0].value):'');
 el('last-detail').textContent=list.length?new Date(list[0].ts).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'})+(list[0].tag?' · '+D.tagLabel(list[0].tag):'')+status(list[0].value):'Your first reading starts here';
 el('today-average').textContent=today.length?Math.round(today.reduce(function(s,r){return s+Number(r.value);},0)/today.length):'--';el('today-count').textContent=today.length+' reading'+(today.length===1?'':'s')+' today';
-var days=[];for(var i=6;i>=0;i--){var date=new Date(now.getFullYear(),now.getMonth(),now.getDate()-i);var rows=list.filter(function(r){return new Date(r.ts).toDateString()===date.toDateString();});days.push({date:date,v:rows.length?Math.round(rows.reduce(function(s,r){return s+Number(r.value);},0)/rows.length):null});}
-var max=Math.max.apply(null,days.map(function(d){return d.v||0;}))||1;
-el('week-chart').innerHTML='<div class="week-bars">'+days.map(function(d){var day=d.date.toLocaleDateString('en-IN',{weekday:'short'});return '<div class="day-bar" aria-label="'+day+': '+(d.v===null?'no readings':d.v+' mg/dL average')+'"><span class="bar-value">'+(d.v===null?'·':d.v)+'</span><div class="bar" style="height:'+(d.v===null?3:Math.max(8,90*d.v/max))+'px;'+(d.v===null?'opacity:.12':'')+'"></div><span class="bar-label">'+day+'</span></div>';}).join('')+'</div>';
-el('week-caption').textContent='Daily averages · relative bars from zero · missing days stay blank';
+if(window.DiaboInsights)window.DiaboInsights.render();
 Array.prototype.forEach.call(document.querySelectorAll('#hist li'),function(li,index){var r=list[index];if(r){li.querySelector('.hv').className='hv '+tone(r.value);li.querySelector('[data-del]').setAttribute('aria-label','Delete '+r.value+' reading');}});
 }
 el('add-reading').addEventListener('click',function(){document.querySelectorAll('.sheet').forEach(function(s){s.classList.add('hidden');});el('sheet-methods').classList.remove('hidden');el('m-pad').focus();});
