@@ -2,6 +2,7 @@
 (function () {
   "use strict";
   var KEY = "diabo-readings-v1";
+  var lastCreated=0;
   var TAGS = ["fasting", "before meal", "after meal"];
   function baseTag(tag){return String(tag||"").split("|date=")[0];}
   function readingDate(r){var m=/\|date=(\d{4}-\d{2}-\d{2})$/.exec(String(r.tag||""));return m?m[1]:"";}
@@ -25,11 +26,13 @@
         return Array.isArray(r) ? r.slice().sort(readingOrder) : [];
       } catch (e) { return []; }
     },
-    save: function (value, tag, timestamp) {
+    save: function (value, tag, timestamp, replacing) {
       var ts = timestamp === undefined ? Date.now() : timestamp;
       if (!Number.isSafeInteger(ts) || ts <= 0 || ts > Date.now()) return false;
       var list = window.Diabo.load();
-      list.unshift({ id: Date.now() + "-" + Math.floor(Math.random() * 1e6), value: value, tag: tag || "", ts: ts });
+      if(replacing)list=list.filter(function(r){return replacing.indexOf(r.id)<0;});
+      lastCreated=Math.max(Date.now(),lastCreated+1);
+      list.unshift({ id: lastCreated + "-" + Math.floor(Math.random() * 1e6), value: value, tag: tag || "", ts: ts });
       list.sort(readingOrder);
       try { localStorage.setItem(KEY, JSON.stringify(list)); } catch (e) { window.dispatchEvent(new CustomEvent("diabo-error")); return false; }
       renderHistory();
@@ -111,7 +114,7 @@
   window.Diabo.resetReadingDate=function(){readingDay=localDate(new Date());pickTag('');syncDateFields();};
   document.querySelectorAll('[data-reading-date]').forEach(function(e){e.addEventListener('change',function(){readingDay=e.value;syncDateFields();});});
   document.querySelectorAll('[data-reading-day]').forEach(function(e){e.addEventListener('click',function(){readingDay=localDate(new Date());syncDateFields();});});
-  window.Diabo.saveReading=function(value,tag){var d=new Date(readingDay+'T00:00:00'),ts=d.getTime();if(!readingDay||!Number.isSafeInteger(ts)||ts<=0||readingDay>localDate(new Date())||localDate(d)!==readingDay){document.querySelectorAll('.sheet:not(.hidden) [data-date-error]').forEach(function(e){e.textContent='Choose a valid date, not in the future.';e.classList.remove('hidden');e.scrollIntoView({block:'nearest'});});return false;}return window.Diabo.save(value,baseTag(tag)+'|date='+readingDay,ts);};
+  window.Diabo.saveReading=function(value,tag){var d=new Date(readingDay+'T00:00:00'),ts=d.getTime();if(!readingDay||!Number.isSafeInteger(ts)||ts<=0||readingDay>localDate(new Date())||localDate(d)!==readingDay){document.querySelectorAll('.sheet:not(.hidden) [data-date-error]').forEach(function(e){e.textContent='Choose a valid date, not in the future.';e.classList.remove('hidden');e.scrollIntoView({block:'nearest'});});return false;}var old=baseTag(tag)?window.Diabo.load().filter(function(r){return readingDate(r)===readingDay&&baseTag(r.tag)===baseTag(tag);}):[];var result=window.Diabo.save(value,baseTag(tag)+'|date='+readingDay,ts,old.map(function(r){return r.id;}));if(result&&old.length)window.dispatchEvent(new CustomEvent('diabo-replaced',{detail:{old:old,next:window.Diabo.load().find(function(r){return readingDate(r)===readingDay&&baseTag(r.tag)===baseTag(tag);})}}));return result;};
   fillTags(document.querySelector('#sheet-methods [data-tags]'),function(){});
   window.Diabo.resetReadingDate();
 
@@ -163,14 +166,14 @@
 })();
 (function(){
 'use strict';
-var D=window.Diabo, el=function(id){return document.getElementById(id);}, toastTimer, deleted;
-function notify(text,undo){clearTimeout(toastTimer);el('toast-text').textContent=text;el('undo').classList.toggle('hidden',!undo);el('toast').classList.remove('hidden');toastTimer=setTimeout(function(){el('toast').classList.add('hidden');deleted=null;},5000);}
+var D=window.Diabo, el=function(id){return document.getElementById(id);}, toastTimer, deleted,replacement;
+function notify(text,undo){clearTimeout(toastTimer);el('toast-text').textContent=text;el('undo').classList.toggle('hidden',!undo);el('toast').classList.remove('hidden');toastTimer=setTimeout(function(){el('toast').classList.add('hidden');deleted=null;replacement=null;},5000);}
 function validRange(r){return r&&Number.isFinite(Number(r.low))&&Number.isFinite(Number(r.high))&&Number(r.low)>=20&&Number(r.high)<=600&&Number(r.low)<Number(r.high);}
-function ranges(){try{var raw=localStorage.getItem('diabo-ranges-v3');if(raw!==null)return JSON.parse(raw)||{};var old=JSON.parse(localStorage.getItem('diabo-range-v2'));if(validRange(old)){var next={morning:old,other:old};localStorage.setItem('diabo-ranges-v3',JSON.stringify(next));return next;}}catch(e){}return {};}
+function ranges(){return {morning:{low:80,high:130},other:{low:80,high:179}};}
 function rangeFor(reading){var all=ranges(),tag=D.baseTag(reading.tag),r=tag==='fasting'||tag==='morning'?all.morning:tag==='before meal'||tag==='after meal'||tag==='afternoon'||tag==='evening'?all.other:null;return validRange(r)?r:null;}
 D.ranges=ranges;D.rangeFor=rangeFor;
 function tone(reading){var r=rangeFor(reading);return !r?'':reading.value<r.low?'below':reading.value>r.high?'above':'within';}
-function status(reading){var r=rangeFor(reading);return !r?'':reading.value<r.low?' · Below your range':reading.value>r.high?' · Above your range':' · Within your range';}
+function status(reading){var r=rangeFor(reading);return !r?'':reading.value<70?' · Low (below 70)':reading.value<r.low?' · Below reference':reading.value>r.high?' · Above reference':' · Within reference';}
 function render(){
 var list=D.load().slice().sort(D.readingOrder), now=new Date(), today=list.filter(function(r){return (D.readingDate(r)?new Date(D.readingDate(r)+'T00:00:00'):new Date(r.ts)).toDateString()===now.toDateString();});
 el('delete-latest').classList.toggle('hidden',!list.length);
@@ -183,9 +186,8 @@ if(window.DiaboInsights)window.DiaboInsights.render();
 el('add-reading').addEventListener('click',function(){D.resetReadingDate();document.querySelectorAll('.sheet').forEach(function(s){s.classList.add('hidden');});el('sheet-methods').classList.remove('hidden');el('m-pad').focus();});
 document.addEventListener('keydown',function(e){if(e.key==='Escape'){document.querySelectorAll('.sheet').forEach(function(s){s.classList.add('hidden');});el('add-reading').focus();}});
 el('delete-latest').addEventListener('click',function(){var r=D.load().slice().sort(D.readingOrder)[0];if(!r)return;D.remove(r.id);});
-window.addEventListener('diabo-render',render);window.addEventListener('diabo-saved',function(){el('add-reading').focus();});window.addEventListener('diabo-error',function(){notify('Storage is full or unavailable. Reading was not changed.',false);});window.addEventListener('diabo-deleted',function(e){deleted=e.detail;notify('Reading deleted',true);});el('undo').addEventListener('click',function(){if(deleted){D.restore(deleted);deleted=null;notify('Reading restored',false);}});
+window.addEventListener('diabo-render',render);window.addEventListener('diabo-saved',function(){replacement=null;el('add-reading').focus();});window.addEventListener('diabo-error',function(){notify('Storage is full or unavailable. Reading was not changed.',false);});window.addEventListener('diabo-deleted',function(e){replacement=null;deleted=e.detail;notify('Reading deleted',true);});window.addEventListener('diabo-replaced',function(e){replacement=e.detail;deleted=null;notify('Previous reading replaced',true);});el('undo').addEventListener('click',function(){if(replacement){var prior=replacement;replacement=null;D.remove(prior.next.id);prior.old.forEach(function(r){D.restore(r);});deleted=null;notify('Previous reading restored',false);return;}if(deleted){D.restore(deleted);deleted=null;notify('Reading restored',false);}});
 
-el('range-form').addEventListener('submit',function(e){e.preventDefault();var all={},bad=false;[['morning','range-low','range-high'],['other','range-other-low','range-other-high']].forEach(function(a){var low=el(a[1]).value,high=el(a[2]).value;if(!low&&!high)return;var r={low:Number(low),high:Number(high)};if(!low||!high||!validRange(r)){bad=true;return;}all[a[0]]=r;});if(bad){el('range-status').textContent='Enter both values from 20 to 600 for each range, with lower below upper. Leave both blank to skip a range.';return;}try{localStorage.setItem('diabo-ranges-v3',JSON.stringify(all));localStorage.removeItem('diabo-range-v2');}catch(e){notify('Could not save your ranges.',false);return;}el('range-status').textContent='Saved. Ranges follow the reading tag.';render();});el('range-clear').addEventListener('click',function(){localStorage.removeItem('diabo-range-v2');localStorage.setItem('diabo-ranges-v3','{}');['range-low','range-high','range-other-low','range-other-high'].forEach(function(id){el(id).value='';});el('range-status').textContent='No target ranges set. Readings use a neutral colour.';render();});var saved=ranges();[['morning','range-low','range-high'],['other','range-other-low','range-other-high']].forEach(function(a){var r=saved[a[0]];if(validRange(r)){el(a[1]).value=r.low;el(a[2]).value=r.high;}});
 var preference='auto';try{preference=localStorage.getItem('diabo-theme-v2')||'auto';}catch(e){}var media=window.matchMedia('(prefers-color-scheme: light)');function theme(){var light=preference==='light'||(preference==='auto'&&media.matches);document.body.classList.toggle('light',light);el('theme-toggle').setAttribute('aria-label',light?'Switch to dark theme':'Switch to light theme');document.documentElement.classList.toggle('light-ready',light);document.querySelector('meta[name="theme-color"]').content=light?'#fafafa':'#151515';}el('theme-toggle').addEventListener('click',function(){preference=document.body.classList.contains('light')?'dark':'light';try{localStorage.setItem('diabo-theme-v2',preference);}catch(e){}theme();});if(media.addEventListener)media.addEventListener('change',theme);theme();render();
 })();
 /* Diabo scan: photo -> on-device 7-segment read (seg7.js). Photo never leaves the phone. */
