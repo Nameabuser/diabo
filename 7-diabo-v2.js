@@ -3,6 +3,16 @@
   "use strict";
   var KEY = "diabo-readings-v1";
   var TAGS = ["fasting", "before meal", "after meal"];
+  function tagLabel(tag) {
+    return { fasting: "Morning", "before meal": "Afternoon", "after meal": "Evening",
+      morning: "Morning", afternoon: "Afternoon", evening: "Evening" }[tag] || tag;
+  }
+  function parseTag(text) {
+    var t = String(text).toLowerCase();
+    return /\b(morning|fasting)\b/.test(t) ? "fasting"
+      : /\b(evening|after)\b/.test(t) ? "after meal"
+      : /\b(afternoon|before)\b/.test(t) ? "before meal" : "";
+  }
 
   window.Diabo = {
     load: function () {
@@ -37,6 +47,9 @@
     valid: function (v) { return /^\d{2,3}$/.test(String(v)) && +v >= 20 && +v <= 600; }
   };
 
+  window.Diabo.tagLabel = tagLabel;
+  window.Diabo.parseTag = parseTag;
+
   function esc(s) {
     return String(s).replace(/[&<>"']/g, function (c) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
@@ -59,7 +72,7 @@
     empty.classList.toggle("hidden", list.length > 0);
     ul.innerHTML = list.map(function (r) {
       return '<li><span class="hv">' + esc(r.value) + "<small>mg/dL</small></span>" +
-        (r.tag ? '<span class="htag">' + esc(r.tag) + "</span>" : "") +
+        (r.tag ? '<span class="htag">' + esc(tagLabel(r.tag)) + "</span>" : "") +
         '<span class="hwhen">' + fmtWhen(r.ts) + "</span>" +
         '<button class="hdel" data-del="' + esc(r.id) + '" type="button" aria-label="delete">✕</button></li>';
     }).join("");
@@ -73,10 +86,11 @@
       var b = document.createElement("button");
       b.type = "button";
       b.className = "tag";
-      b.textContent = t;
+      b.textContent = tagLabel(t);
+      b.setAttribute("data-tag", t);
       b.addEventListener("click", function () {
         cur = cur === t ? "" : t;
-        Array.prototype.forEach.call(container.children, function (c) { c.classList.toggle("on", c.textContent === cur); });
+        Array.prototype.forEach.call(container.children, function (c) { c.classList.toggle("on", c.getAttribute("data-tag") === cur); });
         onPick(cur);
       });
       container.appendChild(b);
@@ -84,7 +98,7 @@
     return {
       set: function (t) {
         cur = TAGS.indexOf(t) >= 0 ? t : "";
-        Array.prototype.forEach.call(container.children, function (c) { c.classList.toggle("on", c.textContent === cur); });
+        Array.prototype.forEach.call(container.children, function (c) { c.classList.toggle("on", c.getAttribute("data-tag") === cur); });
         onPick(cur);
       }
     };
@@ -152,7 +166,7 @@ function status(value){var r=range();return !r?'':value<r.low?' · Below your ra
 function render(){
 var list=D.load().slice().sort(function(a,b){return b.ts-a.ts;}), now=new Date(), today=list.filter(function(r){return new Date(r.ts).toDateString()===now.toDateString();});
 el('last-value').textContent=list.length?list[0].value:'--';el('last-value').className='stat-number '+(list.length?tone(list[0].value):'');
-el('last-detail').textContent=list.length?new Date(list[0].ts).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'})+(list[0].tag?' · '+list[0].tag:'')+status(list[0].value):'Your first reading starts here';
+el('last-detail').textContent=list.length?new Date(list[0].ts).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'})+(list[0].tag?' · '+D.tagLabel(list[0].tag):'')+status(list[0].value):'Your first reading starts here';
 el('today-average').textContent=today.length?Math.round(today.reduce(function(s,r){return s+Number(r.value);},0)/today.length):'--';el('today-count').textContent=today.length+' reading'+(today.length===1?'':'s')+' today';
 var days=[];for(var i=6;i>=0;i--){var date=new Date(now.getFullYear(),now.getMonth(),now.getDate()-i);var rows=list.filter(function(r){return new Date(r.ts).toDateString()===date.toDateString();});days.push({date:date,v:rows.length?Math.round(rows.reduce(function(s,r){return s+Number(r.value);},0)/rows.length):null});}
 var max=Math.max.apply(null,days.map(function(d){return d.v||0;}))||1;
@@ -274,9 +288,7 @@ var preference='auto';try{preference=localStorage.getItem('diabo-theme-v2')||'au
   function parse(text) {
     var t = String(text).toLowerCase();
     var m = t.match(/\d{2,3}/);
-    var tag = /fasting/.test(t) ? "fasting"
-      : /after/.test(t) ? "after meal"
-      : /before/.test(t) ? "before meal" : "";
+    var tag = window.Diabo.parseTag(t);
     return { value: m ? m[0] : "", tag: tag };
   }
 
