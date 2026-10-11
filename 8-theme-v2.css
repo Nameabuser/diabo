@@ -17,3 +17,6 @@
 .range-helper{margin:12px 0!important;font-size:12px!important}.range-compact-row{display:grid;grid-template-columns:minmax(96px,1.7fr) minmax(54px,1fr) 8px minmax(54px,1fr);align-items:center;gap:6px;margin:8px 0;font-size:12px}.range-compact-row input{width:100%;min-width:0;min-height:44px;padding:8px 6px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink);font:inherit;font-size:16px}.range-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}.range-actions button{width:100%;margin:0;min-height:44px}.reading-date .tags{margin:12px 0 0;display:flex;gap:6px}.reading-date .tag{flex:1;padding:10px 6px;min-height:44px;font-size:12px}
 
 .delete-latest{display:block;border:0;background:none;color:var(--muted);font:inherit;font-size:11px;text-decoration:underline;text-underline-offset:3px;padding:12px 0 0;min-height:44px;text-align:left;cursor:pointer}.delete-latest:hover{color:var(--ink)}
+
+/* Keep the page on the browser's native scrolling path. */
+html{overflow-y:auto;scroll-behavior:auto;scrollbar-width:none}body{overflow:visible;scroll-behavior:auto}html::-webkit-scrollbar,body::-webkit-scrollbar,.sheet::-webkit-scrollbar{display:none;width:0;height:0}.sheet{scrollbar-width:none;-webkit-overflow-scrolling:touch}
