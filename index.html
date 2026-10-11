@@ -12,7 +12,11 @@
 <link rel="apple-touch-icon" href="icons/1-apple-touch-icon.png">
 <link rel="icon" type="image/png" href="icons/2-icon-192.png">
 <title>Diabo</title>
+<!-- Method selector update v3 -->
 <link rel="stylesheet" href="8-theme-v2.css?v=2">
+<style>
+.method-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 0}.method-row label{font-weight:600;font-size:15px}.method-row select{flex:0 1 62%;width:auto;min-width:0;min-height:44px;padding:8px 36px 8px 12px;border:1px solid var(--line);border-radius:12px;background-color:var(--bg);color:var(--ink);font:inherit;font-size:16px;touch-action:manipulation}.method-row select:focus-visible{outline:3px solid var(--accent);outline-offset:4px}
+</style>
 </head>
 <body>
 <header>
@@ -32,7 +36,8 @@
   <button class="add-reading" id="add-reading" type="button"><span>＋</span> Add reading</button>
   <section class="trend"><div class="section-heading"><h2>Your week</h2><span>Daily average · mg/dL</span></div><div id="week-chart"></div><p id="week-caption" class="hint">Your readings will appear here.</p></section>
   <section class="sheet hidden" id="sheet-methods"><div class="sheet-head"><h2>Add a reading</h2><button class="x" data-close type="button" aria-label="Close">✕</button></div><p class="hint">Choose what works for you.</p>
-  <section class="modes" id="modes">
+  <div class="method-row"><label for="reading-method">Method</label><select id="reading-method" aria-label="Reading method"><option value="" selected disabled>Choose method</option><option value="m-scan">Scan meter</option><option value="m-pad">Number pad</option><option value="m-voice">Voice</option></select></div>
+  <section class="modes hidden" aria-hidden="true" id="modes">
     <button class="mode" id="m-scan" type="button">
       <span class="mode-ic">📷</span>
       <span class="mode-tx">Scan meter</span>
@@ -102,5 +107,12 @@
 
 <script src="seg7.js?v=2" defer></script>
 <script src="7-diabo-v2.js?v=2" defer></script>
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+var choice=document.getElementById('reading-method');
+choice.addEventListener('change',function(){var button=document.getElementById(choice.value);if(button){button.click();choice.value='';}});
+document.getElementById('add-reading').addEventListener('click',function(){choice.value='';choice.focus();});
+});
+</script>
 </body>
 </html>
