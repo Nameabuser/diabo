@@ -20,3 +20,5 @@
 
 /* Keep the page on the browser's native scrolling path. */
 html{overflow-y:auto;scroll-behavior:auto;scrollbar-width:none}body{overflow:visible;scroll-behavior:auto}html::-webkit-scrollbar,body::-webkit-scrollbar,.sheet::-webkit-scrollbar{display:none;width:0;height:0}.sheet{scrollbar-width:none;-webkit-overflow-scrolling:touch}
+
+.long-averages{gap:12px;padding:18px 20px}.long-averages .average-note{font-size:10px;line-height:1.5}
