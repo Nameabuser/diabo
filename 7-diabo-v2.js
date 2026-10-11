@@ -78,16 +78,6 @@
   }
 
   function renderHistory() {
-    var ul = document.getElementById("hist");
-    var empty = document.getElementById("hist-empty");
-    var list = window.Diabo.load();
-    empty.classList.toggle("hidden", list.length > 0);
-    ul.innerHTML = list.map(function (r) {
-      return '<li><span class="hv">' + esc(r.value) + "<small>mg/dL</small></span>" +
-        (baseTag(r.tag) ? '<span class="htag">' + esc(tagLabel(r.tag)) + "</span>" : "") +
-        '<span class="hwhen">' + fmtWhen(r) + "</span>" +
-        '<button class="hdel" data-del="' + esc(r.id) + '" type="button" aria-label="delete">✕</button></li>';
-    }).join("");
     window.dispatchEvent(new CustomEvent("diabo-render"));
   }
 
@@ -139,11 +129,6 @@
     b.addEventListener("click", function () { b.closest(".sheet").classList.add("hidden"); });
   });
 
-  document.getElementById("hist").addEventListener("click", function (e) {
-    var b = e.target.closest("[data-del]");
-    if (b) window.Diabo.remove(b.getAttribute("data-del"));
-  });
-
   /* number pad */
   var padVal = "";
   var padTag = "";
@@ -187,16 +172,18 @@ function tone(reading){var r=rangeFor(reading);return !r?'':reading.value<r.low?
 function status(reading){var r=rangeFor(reading);return !r?'':reading.value<r.low?' · Below your range':reading.value>r.high?' · Above your range':' · Within your range';}
 function render(){
 var list=D.load().slice().sort(function(a,b){return b.ts-a.ts;}), now=new Date(), today=list.filter(function(r){return (D.readingDate(r)?new Date(D.readingDate(r)+'T00:00:00'):new Date(r.ts)).toDateString()===now.toDateString();});
+el('delete-latest').classList.toggle('hidden',!list.length);
 el('last-value').textContent=list.length?list[0].value:'--';el('last-value').className='stat-number '+(list.length?tone(list[0]):'');
 el('last-detail').textContent=list.length?(D.readingDate(list[0])?new Date(D.readingDate(list[0])+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'}):new Date(list[0].ts).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}))+(D.baseTag(list[0].tag)?' · '+D.tagLabel(list[0].tag):'')+status(list[0]):'Your first reading starts here';
 el('today-average').textContent=today.length?Math.round(today.reduce(function(s,r){return s+Number(r.value);},0)/today.length):'--';el('today-count').textContent=today.length+' reading'+(today.length===1?'':'s')+' today';
 if(window.DiaboInsights)window.DiaboInsights.render();
-Array.prototype.forEach.call(document.querySelectorAll('#hist li'),function(li,index){var r=list[index];if(r){li.querySelector('.hv').className='hv '+tone(r);li.querySelector('[data-del]').setAttribute('aria-label','Delete '+r.value+' reading');}});
+
 }
 el('add-reading').addEventListener('click',function(){D.resetReadingDate();document.querySelectorAll('.sheet').forEach(function(s){s.classList.add('hidden');});el('sheet-methods').classList.remove('hidden');el('m-pad').focus();});
 document.addEventListener('keydown',function(e){if(e.key==='Escape'){document.querySelectorAll('.sheet').forEach(function(s){s.classList.add('hidden');});el('add-reading').focus();}});
+el('delete-latest').addEventListener('click',function(){var r=D.load().slice().sort(function(a,b){return b.ts-a.ts;})[0];if(!r)return;var when=D.readingDate(r)||new Date(r.ts).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'});if(window.confirm('Delete '+r.value+' mg/dL'+(D.baseTag(r.tag)?' · '+D.tagLabel(r.tag):'')+' · '+when+'?'))D.remove(r.id);});
 window.addEventListener('diabo-render',render);window.addEventListener('diabo-saved',function(){notify('Reading saved',false);el('add-reading').focus();});window.addEventListener('diabo-error',function(){notify('Storage is full or unavailable. Reading was not changed.',false);});window.addEventListener('diabo-deleted',function(e){deleted=e.detail;notify('Reading deleted',true);});el('undo').addEventListener('click',function(){if(deleted){D.restore(deleted);deleted=null;notify('Reading restored',false);}});
-var startX=0,startY=0;el('hist').addEventListener('touchstart',function(e){startX=e.changedTouches[0].clientX;startY=e.changedTouches[0].clientY;},{passive:true});el('hist').addEventListener('touchend',function(e){var t=e.changedTouches[0];if(startX-t.clientX>85&&Math.abs(startY-t.clientY)<35){var row=e.target.closest('li');if(row)D.remove(row.querySelector('[data-del]').getAttribute('data-del'));}},{passive:true});
+
 el('range-form').addEventListener('submit',function(e){e.preventDefault();var all={},bad=false;[['morning','range-low','range-high'],['other','range-other-low','range-other-high']].forEach(function(a){var low=el(a[1]).value,high=el(a[2]).value;if(!low&&!high)return;var r={low:Number(low),high:Number(high)};if(!low||!high||!validRange(r)){bad=true;return;}all[a[0]]=r;});if(bad){el('range-status').textContent='Enter both values from 20 to 600 for each range, with lower below upper. Leave both blank to skip a range.';return;}try{localStorage.setItem('diabo-ranges-v3',JSON.stringify(all));localStorage.removeItem('diabo-range-v2');}catch(e){notify('Could not save your ranges.',false);return;}el('range-status').textContent='Saved. Ranges follow the reading tag.';render();});el('range-clear').addEventListener('click',function(){localStorage.removeItem('diabo-range-v2');localStorage.setItem('diabo-ranges-v3','{}');['range-low','range-high','range-other-low','range-other-high'].forEach(function(id){el(id).value='';});el('range-status').textContent='No target ranges set. Readings use a neutral colour.';render();});var saved=ranges();[['morning','range-low','range-high'],['other','range-other-low','range-other-high']].forEach(function(a){var r=saved[a[0]];if(validRange(r)){el(a[1]).value=r.low;el(a[2]).value=r.high;}});
 var preference='auto';try{preference=localStorage.getItem('diabo-theme-v2')||'auto';}catch(e){}var media=window.matchMedia('(prefers-color-scheme: light)');function theme(){var light=preference==='light'||(preference==='auto'&&media.matches);document.body.classList.toggle('light',light);el('theme-toggle').setAttribute('aria-label',light?'Switch to dark theme':'Switch to light theme');document.documentElement.classList.toggle('light-ready',light);document.querySelector('meta[name="theme-color"]').content=light?'#fafafa':'#151515';}el('theme-toggle').addEventListener('click',function(){preference=document.body.classList.contains('light')?'dark':'light';try{localStorage.setItem('diabo-theme-v2',preference);}catch(e){}theme();});if(media.addEventListener)media.addEventListener('change',theme);theme();render();
 })();
