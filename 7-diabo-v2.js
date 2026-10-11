@@ -44,6 +44,10 @@
       try { localStorage.setItem(KEY, JSON.stringify(list)); } catch(e) { window.dispatchEvent(new CustomEvent("diabo-error")); return; }
       renderHistory();
     },
+    replaceReadings: function (list) {
+      try { localStorage.setItem(KEY, JSON.stringify(list)); } catch (e) { window.dispatchEvent(new CustomEvent("diabo-error")); return false; }
+      renderHistory(); return true;
+    },
     valid: function (v) { return /^\d{2,3}$/.test(String(v)) && +v >= 20 && +v <= 600; }
   };
 
