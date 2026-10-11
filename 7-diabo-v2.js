@@ -3,7 +3,10 @@
   "use strict";
   var KEY = "diabo-readings-v1";
   var TAGS = ["fasting", "before meal", "after meal"];
+  function baseTag(tag){return String(tag||"").split("|date=")[0];}
+  function readingDate(r){var m=/\|date=(\d{4}-\d{2}-\d{2})$/.exec(String(r.tag||""));return m?m[1]:"";}
   function tagLabel(tag) {
+    tag=baseTag(tag);
     return { fasting: "Morning", "before meal": "Afternoon", "after meal": "Evening",
       morning: "Morning", afternoon: "Afternoon", evening: "Evening" }[tag] || tag;
   }
@@ -55,6 +58,7 @@
   };
 
   window.Diabo.tagLabel = tagLabel;
+  window.Diabo.baseTag=baseTag;window.Diabo.readingDate=readingDate;
   window.Diabo.parseTag = parseTag;
 
   function esc(s) {
@@ -63,11 +67,12 @@
     });
   }
 
-  function fmtWhen(ts) {
-    var d = new Date(ts), now = new Date();
+  function fmtWhen(r) {
+    var d = new Date(readingDate(r)?readingDate(r)+"T00:00:00":r.ts), now = new Date();
     var day = d.toDateString() === now.toDateString() ? "Today"
       : d.toDateString() === new Date(now.getTime() - 864e5).toDateString() ? "Yesterday"
       : d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+    if(readingDate(r))return day;
     var time = d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true });
     return day + "<br>" + time;
   }
@@ -79,13 +84,15 @@
     empty.classList.toggle("hidden", list.length > 0);
     ul.innerHTML = list.map(function (r) {
       return '<li><span class="hv">' + esc(r.value) + "<small>mg/dL</small></span>" +
-        (r.tag ? '<span class="htag">' + esc(tagLabel(r.tag)) + "</span>" : "") +
-        '<span class="hwhen">' + fmtWhen(r.ts) + "</span>" +
+        (baseTag(r.tag) ? '<span class="htag">' + esc(tagLabel(r.tag)) + "</span>" : "") +
+        '<span class="hwhen">' + fmtWhen(r) + "</span>" +
         '<button class="hdel" data-del="' + esc(r.id) + '" type="button" aria-label="delete">✕</button></li>';
     }).join("");
     window.dispatchEvent(new CustomEvent("diabo-render"));
   }
 
+  var sharedTag = "", tagControls = [];
+  function pickTag(t) {sharedTag=t;tagControls.forEach(function(c){c.update(t);});}
   function fillTags(container, onPick) {
     container.innerHTML = "";
     var cur = "";
@@ -96,32 +103,25 @@
       b.textContent = tagLabel(t);
       b.setAttribute("data-tag", t);
       b.addEventListener("click", function () {
-        cur = cur === t ? "" : t;
-        Array.prototype.forEach.call(container.children, function (c) { c.classList.toggle("on", c.getAttribute("data-tag") === cur); });
-        onPick(cur);
+        pickTag(cur === t ? "" : t);
       });
       container.appendChild(b);
     });
-    return {
-      set: function (t) {
-        cur = TAGS.indexOf(t) >= 0 ? t : "";
-        Array.prototype.forEach.call(container.children, function (c) { c.classList.toggle("on", c.getAttribute("data-tag") === cur); });
-        onPick(cur);
-      }
-    };
+    var ctl={update:function(t){cur=TAGS.indexOf(t)>=0?t:"";Array.prototype.forEach.call(container.children,function(c){c.classList.toggle("on",c.getAttribute("data-tag")===cur);c.setAttribute("aria-pressed",String(c.getAttribute("data-tag")===cur));});onPick(cur);},set:pickTag};
+    tagControls.push(ctl);ctl.update(sharedTag);return ctl;
   }
+
   window.Diabo.fillTags = fillTags;
 
   /* The date draft is for manual entry only. Siri/API saves still default to now. */
-  var readingDay='',readingTime='',dateEdited=false;
+  var readingDay='';
   function localDate(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
-  function localTime(d){return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
-  function syncDateFields(){var now=new Date(),today=localDate(now),yesterday=localDate(new Date(now.getFullYear(),now.getMonth(),now.getDate()-1));document.querySelectorAll('[data-reading-date]').forEach(function(e){e.value=readingDay;e.max=today;e.min='1970-01-02';});document.querySelectorAll('[data-reading-time]').forEach(function(e){e.value=readingTime;});document.querySelectorAll('[data-reading-day]').forEach(function(e){e.setAttribute('aria-pressed',String(readingDay===(e.dataset.readingDay==='today'?today:yesterday)));});document.querySelectorAll('[data-date-error]').forEach(function(e){e.classList.add('hidden');});}
-  window.Diabo.resetReadingDate=function(){var n=new Date();readingDay=localDate(n);readingTime=localTime(n);dateEdited=false;syncDateFields();};
-  document.querySelectorAll('[data-reading-date]').forEach(function(e){e.addEventListener('change',function(){readingDay=e.value;dateEdited=true;syncDateFields();});});
-  document.querySelectorAll('[data-reading-time]').forEach(function(e){e.addEventListener('change',function(){readingTime=e.value;dateEdited=true;syncDateFields();});});
-  document.querySelectorAll('[data-reading-day]').forEach(function(e){e.addEventListener('click',function(){var n=new Date();readingDay=localDate(new Date(n.getFullYear(),n.getMonth(),n.getDate()-(e.dataset.readingDay==='yesterday'?1:0)));dateEdited=true;syncDateFields();});});
-  window.Diabo.saveReading=function(value,tag){var now=new Date(),ts=+now,d;if(dateEdited){d=new Date(readingDay+'T'+readingTime+':00');ts=d.getTime();}if(!readingDay||!readingTime||!Number.isSafeInteger(ts)||ts<=0||ts>+now||dateEdited&&(localDate(d)!==readingDay||localTime(d)!==readingTime)){document.querySelectorAll('.sheet:not(.hidden) [data-date-error]').forEach(function(e){e.textContent='Choose a valid date and time, not in the future.';e.classList.remove('hidden');e.scrollIntoView({block:'nearest'});});return false;}return window.Diabo.save(value,tag,ts);};
+  function syncDateFields(){var today=localDate(new Date());document.querySelectorAll('[data-reading-date]').forEach(function(e){e.value=readingDay;e.max=today;e.min='1970-01-02';});document.querySelectorAll('[data-reading-day]').forEach(function(e){e.setAttribute('aria-pressed',String(readingDay===today));});document.querySelectorAll('[data-date-error]').forEach(function(e){e.classList.add('hidden');});}
+  window.Diabo.resetReadingDate=function(){readingDay=localDate(new Date());pickTag('');syncDateFields();};
+  document.querySelectorAll('[data-reading-date]').forEach(function(e){e.addEventListener('change',function(){readingDay=e.value;syncDateFields();});});
+  document.querySelectorAll('[data-reading-day]').forEach(function(e){e.addEventListener('click',function(){readingDay=localDate(new Date());syncDateFields();});});
+  window.Diabo.saveReading=function(value,tag){var d=new Date(readingDay+'T00:00:00'),ts=d.getTime();if(!readingDay||!Number.isSafeInteger(ts)||ts<=0||readingDay>localDate(new Date())||localDate(d)!==readingDay){document.querySelectorAll('.sheet:not(.hidden) [data-date-error]').forEach(function(e){e.textContent='Choose a valid date, not in the future.';e.classList.remove('hidden');e.scrollIntoView({block:'nearest'});});return false;}return window.Diabo.save(value,baseTag(tag)+'|date='+readingDay,ts);};
+  fillTags(document.querySelector('#sheet-methods [data-tags]'),function(){});
   window.Diabo.resetReadingDate();
 
   /* sheet switching */
@@ -181,14 +181,14 @@ var D=window.Diabo, el=function(id){return document.getElementById(id);}, toastT
 function notify(text,undo){clearTimeout(toastTimer);el('toast-text').textContent=text;el('undo').classList.toggle('hidden',!undo);el('toast').classList.remove('hidden');toastTimer=setTimeout(function(){el('toast').classList.add('hidden');deleted=null;},5000);}
 function validRange(r){return r&&Number.isFinite(Number(r.low))&&Number.isFinite(Number(r.high))&&Number(r.low)>=20&&Number(r.high)<=600&&Number(r.low)<Number(r.high);}
 function ranges(){try{var raw=localStorage.getItem('diabo-ranges-v3');if(raw!==null)return JSON.parse(raw)||{};var old=JSON.parse(localStorage.getItem('diabo-range-v2'));if(validRange(old)){var next={morning:old,other:old};localStorage.setItem('diabo-ranges-v3',JSON.stringify(next));return next;}}catch(e){}return {};}
-function rangeFor(reading){var all=ranges(),tag=reading.tag,r=tag==='fasting'||tag==='morning'?all.morning:tag==='before meal'||tag==='after meal'||tag==='afternoon'||tag==='evening'?all.other:null;return validRange(r)?r:null;}
+function rangeFor(reading){var all=ranges(),tag=D.baseTag(reading.tag),r=tag==='fasting'||tag==='morning'?all.morning:tag==='before meal'||tag==='after meal'||tag==='afternoon'||tag==='evening'?all.other:null;return validRange(r)?r:null;}
 D.ranges=ranges;D.rangeFor=rangeFor;
 function tone(reading){var r=rangeFor(reading);return !r?'':reading.value<r.low?'below':reading.value>r.high?'above':'within';}
 function status(reading){var r=rangeFor(reading);return !r?'':reading.value<r.low?' · Below your range':reading.value>r.high?' · Above your range':' · Within your range';}
 function render(){
-var list=D.load().slice().sort(function(a,b){return b.ts-a.ts;}), now=new Date(), today=list.filter(function(r){return new Date(r.ts).toDateString()===now.toDateString();});
+var list=D.load().slice().sort(function(a,b){return b.ts-a.ts;}), now=new Date(), today=list.filter(function(r){return (D.readingDate(r)?new Date(D.readingDate(r)+'T00:00:00'):new Date(r.ts)).toDateString()===now.toDateString();});
 el('last-value').textContent=list.length?list[0].value:'--';el('last-value').className='stat-number '+(list.length?tone(list[0]):'');
-el('last-detail').textContent=list.length?new Date(list[0].ts).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'})+(list[0].tag?' · '+D.tagLabel(list[0].tag):'')+status(list[0]):'Your first reading starts here';
+el('last-detail').textContent=list.length?(D.readingDate(list[0])?new Date(D.readingDate(list[0])+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'}):new Date(list[0].ts).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}))+(D.baseTag(list[0].tag)?' · '+D.tagLabel(list[0].tag):'')+status(list[0]):'Your first reading starts here';
 el('today-average').textContent=today.length?Math.round(today.reduce(function(s,r){return s+Number(r.value);},0)/today.length):'--';el('today-count').textContent=today.length+' reading'+(today.length===1?'':'s')+' today';
 if(window.DiaboInsights)window.DiaboInsights.render();
 Array.prototype.forEach.call(document.querySelectorAll('#hist li'),function(li,index){var r=list[index];if(r){li.querySelector('.hv').className='hv '+tone(r);li.querySelector('[data-del]').setAttribute('aria-label','Delete '+r.value+' reading');}});
@@ -197,7 +197,7 @@ el('add-reading').addEventListener('click',function(){D.resetReadingDate();docum
 document.addEventListener('keydown',function(e){if(e.key==='Escape'){document.querySelectorAll('.sheet').forEach(function(s){s.classList.add('hidden');});el('add-reading').focus();}});
 window.addEventListener('diabo-render',render);window.addEventListener('diabo-saved',function(){notify('Reading saved',false);el('add-reading').focus();});window.addEventListener('diabo-error',function(){notify('Storage is full or unavailable. Reading was not changed.',false);});window.addEventListener('diabo-deleted',function(e){deleted=e.detail;notify('Reading deleted',true);});el('undo').addEventListener('click',function(){if(deleted){D.restore(deleted);deleted=null;notify('Reading restored',false);}});
 var startX=0,startY=0;el('hist').addEventListener('touchstart',function(e){startX=e.changedTouches[0].clientX;startY=e.changedTouches[0].clientY;},{passive:true});el('hist').addEventListener('touchend',function(e){var t=e.changedTouches[0];if(startX-t.clientX>85&&Math.abs(startY-t.clientY)<35){var row=e.target.closest('li');if(row)D.remove(row.querySelector('[data-del]').getAttribute('data-del'));}},{passive:true});
-el('range-form').addEventListener('submit',function(e){e.preventDefault();var all={},bad=false;[['morning','range-low','range-high'],['other','range-other-low','range-other-high']].forEach(function(a){var low=el(a[1]).value,high=el(a[2]).value;if(!low&&!high)return;var r={low:Number(low),high:Number(high)};if(!low||!high||!validRange(r)){bad=true;return;}all[a[0]]=r;});if(bad){el('range-status').textContent='Enter both values from 20 to 600 for each range, with lower below upper. Leave both blank to skip a range.';return;}try{localStorage.setItem('diabo-ranges-v3',JSON.stringify(all));localStorage.removeItem('diabo-range-v2');}catch(e){notify('Could not save your ranges.',false);return;}el('range-status').textContent='Ranges saved. They follow the selected Morning, Afternoon or Evening tag.';render();});el('range-clear').addEventListener('click',function(){localStorage.removeItem('diabo-range-v2');localStorage.setItem('diabo-ranges-v3','{}');['range-low','range-high','range-other-low','range-other-high'].forEach(function(id){el(id).value='';});el('range-status').textContent='No target ranges set. Readings use a neutral colour.';render();});var saved=ranges();[['morning','range-low','range-high'],['other','range-other-low','range-other-high']].forEach(function(a){var r=saved[a[0]];if(validRange(r)){el(a[1]).value=r.low;el(a[2]).value=r.high;}});
+el('range-form').addEventListener('submit',function(e){e.preventDefault();var all={},bad=false;[['morning','range-low','range-high'],['other','range-other-low','range-other-high']].forEach(function(a){var low=el(a[1]).value,high=el(a[2]).value;if(!low&&!high)return;var r={low:Number(low),high:Number(high)};if(!low||!high||!validRange(r)){bad=true;return;}all[a[0]]=r;});if(bad){el('range-status').textContent='Enter both values from 20 to 600 for each range, with lower below upper. Leave both blank to skip a range.';return;}try{localStorage.setItem('diabo-ranges-v3',JSON.stringify(all));localStorage.removeItem('diabo-range-v2');}catch(e){notify('Could not save your ranges.',false);return;}el('range-status').textContent='Saved. Ranges follow the reading tag.';render();});el('range-clear').addEventListener('click',function(){localStorage.removeItem('diabo-range-v2');localStorage.setItem('diabo-ranges-v3','{}');['range-low','range-high','range-other-low','range-other-high'].forEach(function(id){el(id).value='';});el('range-status').textContent='No target ranges set. Readings use a neutral colour.';render();});var saved=ranges();[['morning','range-low','range-high'],['other','range-other-low','range-other-high']].forEach(function(a){var r=saved[a[0]];if(validRange(r)){el(a[1]).value=r.low;el(a[2]).value=r.high;}});
 var preference='auto';try{preference=localStorage.getItem('diabo-theme-v2')||'auto';}catch(e){}var media=window.matchMedia('(prefers-color-scheme: light)');function theme(){var light=preference==='light'||(preference==='auto'&&media.matches);document.body.classList.toggle('light',light);el('theme-toggle').setAttribute('aria-label',light?'Switch to dark theme':'Switch to light theme');document.documentElement.classList.toggle('light-ready',light);document.querySelector('meta[name="theme-color"]').content=light?'#fafafa':'#151515';}el('theme-toggle').addEventListener('click',function(){preference=document.body.classList.contains('light')?'dark':'light';try{localStorage.setItem('diabo-theme-v2',preference);}catch(e){}theme();});if(media.addEventListener)media.addEventListener('change',theme);theme();render();
 })();
 /* Diabo scan: photo -> on-device 7-segment read (seg7.js). Photo never leaves the phone. */
@@ -322,7 +322,7 @@ var preference='auto';try{preference=localStorage.getItem('diabo-theme-v2')||'au
       var p = parse(text);
       heard.textContent = '"' + text + '"';
       numField.value = p.value;
-      tagCtl.set(p.tag);
+      if(p.tag)tagCtl.set(p.tag);
       confirmBox.classList.remove("hidden");
       status.classList.add("hidden");
     };
