@@ -31,3 +31,5 @@ html{overflow-y:auto;scroll-behavior:auto;scrollbar-width:none}body{overflow:vis
 .intro{margin-bottom:25px}
 
 .header-eyebrow{max-width:620px;margin:8px auto 0;padding:0 24px;text-align:right}.header-eyebrow .eyebrow{display:block}
+
+.overview #today-average{color:var(--warn)}.overview #last-value{color:var(--ink)}
