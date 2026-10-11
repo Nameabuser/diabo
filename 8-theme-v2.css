@@ -29,3 +29,5 @@ html{overflow-y:auto;scroll-behavior:auto;scrollbar-width:none}body{overflow:vis
 .range-card .range-note{line-height:1.7;margin-bottom:8px}.range-card .range-safety{font-size:10px;line-height:1.5;margin:0}.range-about{margin-top:8px;color:var(--muted)}.range-about summary{font-size:10px;min-height:32px;display:flex;align-items:center;gap:6px}.range-about summary::before{content:"+";font-size:13px}.range-about[open] summary::before{content:"−"}.range-about .hint{font-size:11px;line-height:1.6;margin:6px 0}.range-about a{color:inherit;text-underline-offset:2px}
 
 .intro{margin-bottom:25px}
+
+.header-eyebrow{max-width:620px;margin:8px auto 0;padding:0 24px;text-align:right}.header-eyebrow .eyebrow{display:block}
