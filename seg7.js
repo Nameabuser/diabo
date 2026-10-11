@@ -195,7 +195,7 @@
       maxScore = Math.max(maxScore, sc); minMargin = Math.min(minMargin, r[2] || 0);
       if (d && sc < 1.15 && (r[2] || 0) >= 0.45) { out += d; valid++; ssum += sc; } else { out += "?"; ssum += 3; }
     }
-    return { out: out, valid: valid, ssum: ssum, maxScore: maxScore, minMargin: minMargin, height: bandH / h, cells: cells.length };
+    return { out: out, valid: valid, ssum: ssum, ink: ink, w: w, h: h, maxScore: maxScore, minMargin: minMargin, height: bandH / h, cells: cells.length };
   }
   function runDetect(g, w, h) {
     var thr = otsu(g), results = [], dark, ink, i, r;
@@ -220,7 +220,7 @@
         if (trial.valid > r.valid || (trial.valid === r.valid && trial.ssum < r.ssum)) r = trial;
       }
       var qm = (r.out.split("?").length - 1);
-      results.push({ valid: r.valid, negq: -qm, negS: -r.ssum, out: r.out, height: r.height || 0, maxScore: r.maxScore || 9, minMargin: r.minMargin || 0 });
+      results.push({ valid: r.valid, negq: -qm, negS: -r.ssum, out: r.out, row: r.ink?{ink:r.ink,w:r.w,h:r.h}:null, height: r.height || 0, maxScore: r.maxScore || 9, minMargin: r.minMargin || 0 });
     }
     results.sort(function (a, b) { return b.valid - a.valid || b.negq - a.negq || b.negS - a.negS; });
     return results[0];
@@ -253,23 +253,24 @@
     var expanded=new Uint8Array(clean.length),gap=Math.max(2,Math.round(4*scale));
     for(var i=0;i<clean.length;i++)if(clean[i]){var x=i%w,y=(i/w)|0;for(var yy=Math.max(0,y-gap);yy<=Math.min(h-1,y+gap);yy++)for(var xx=Math.max(0,x-gap);xx<=Math.min(w-1,x+gap);xx++)expanded[yy*w+xx]=1;}
     var groups=components(expanded,w,h),results=[];
-    groups.forEach(function(c){if(c.w<35*scale||c.w>120*scale||c.h<25*scale||c.h>70*scale)return;var pad=Math.round(5*scale),sw=c.w+pad*2,sh=c.h+pad*2,sub=new Uint8Array(sw*sh);for(var yy=0;yy<c.h;yy++)for(var xx=0;xx<c.w;xx++)sub[(yy+pad)*sw+xx+pad]=clean[(yy+c.y)*w+xx+c.x];var d=detect(sub,sw,sh);if(/^[0-9]{2,3}$/.test(d.out)&&d.valid===d.out.length&&d.maxScore<=1.15&&d.minMargin>=.6)results.push({out:d.out,height:c.h,score:d.maxScore});});
+    groups.forEach(function(c){if(c.w<35*scale||c.w>120*scale||c.h<25*scale||c.h>70*scale)return;var pad=Math.round(5*scale),sw=c.w+pad*2,sh=c.h+pad*2,sub=new Uint8Array(sw*sh);for(var yy=0;yy<c.h;yy++)for(var xx=0;xx<c.w;xx++)sub[(yy+pad)*sw+xx+pad]=clean[(yy+c.y)*w+xx+c.x];var d=detect(sub,sw,sh);if(/^[0-9]{2,3}$/.test(d.out)&&d.valid===d.out.length&&d.maxScore<=1.15&&d.minMargin>=.6)results.push({out:d.out,height:c.h,score:d.maxScore,ink:sub,w:sw,h:sh});});
     results.sort(function(a,b){return b.height-a.height;});
     if(!results.length)return null;
     // Competing similarly sized readings are not a reason to guess.
     for(i=1;i<results.length;i++)if(results[i].height>=results[0].height*.7&&results[i].out!==results[0].out)return null;
     return results[0];
   }
-  function readAdaptive(grab,fw,fh){
-    var votes={},angs=[-4,0,4],radii=[6,10,14,20],thresholds=[5,9,13],scale=Math.max(fw,fh)/374;
-    for(var ai=0;ai<angs.length;ai++) {var source=grab(fw,fh,angs[ai]), factor=Math.min(1,374/Math.max(fw,fh)),w=Math.round(fw*factor),h=Math.round(fh*factor),g=new Uint8Array(w*h);for(var yy=0;yy<h;yy++)for(var xx=0;xx<w;xx++)g[yy*w+xx]=source[Math.min(fh-1,Math.round(yy/factor))*fw+Math.min(fw-1,Math.round(xx/factor))];scale=Math.max(w,h)/374;for(var ri=0;ri<radii.length;ri++)for(var ti=0;ti<thresholds.length;ti++){var r=adaptiveRows(g,w,h,Math.max(3,Math.round(radii[ri]*scale)),thresholds[ti]);if(r){var v=votes[r.out]||(votes[r.out]={count:0,angles:{},thresholds:{}});v.count++;v.angles[ai]=true;v.thresholds[ti]=true;}}}
-    var keys=Object.keys(votes).sort(function(a,b){return votes[b].count-votes[a].count;});if(!keys.length)return "";var v=votes[keys[0]],total=0;keys.forEach(function(k){total+=votes[k].count;});if(v.count/total<.85)return "";for(var ki=1;ki<keys.length;ki++)if(votes[keys[ki]].count>=2)return "";return v.count>=4&&Object.keys(v.angles).length>=2&&Object.keys(v.thresholds).length>=2?keys[0]:"";
+  var lastRow=null;
+  function readAdaptive(grab,fw,fh){lastRow=null;
+    var votes={},bestRows={},angs=[-4,0,4],radii=[6,10,14,20],thresholds=[5,9,13],scale=Math.max(fw,fh)/374;
+    for(var ai=0;ai<angs.length;ai++) {var source=grab(fw,fh,angs[ai]), factor=Math.min(1,374/Math.max(fw,fh)),w=Math.round(fw*factor),h=Math.round(fh*factor),g=new Uint8Array(w*h);for(var yy=0;yy<h;yy++)for(var xx=0;xx<w;xx++)g[yy*w+xx]=source[Math.min(fh-1,Math.round(yy/factor))*fw+Math.min(fw-1,Math.round(xx/factor))];scale=Math.max(w,h)/374;for(var ri=0;ri<radii.length;ri++)for(var ti=0;ti<thresholds.length;ti++){var r=adaptiveRows(g,w,h,Math.max(3,Math.round(radii[ri]*scale)),thresholds[ti]);if(r){var v=votes[r.out]||(votes[r.out]={count:0,angles:{},thresholds:{}});v.count++;v.angles[ai]=true;v.thresholds[ti]=true;if(!bestRows[r.out]||r.score<bestRows[r.out].score)bestRows[r.out]=r;}}}
+    var keys=Object.keys(votes).sort(function(a,b){return votes[b].count-votes[a].count;});if(!keys.length)return "";var v=votes[keys[0]],total=0;keys.forEach(function(k){total+=votes[k].count;});if(v.count/total<.85)return "";for(var ki=1;ki<keys.length;ki++)if(votes[keys[ki]].count>=2)return "";if(v.count>=4&&Object.keys(v.angles).length>=2&&Object.keys(v.thresholds).length>=2){lastRow=bestRows[keys[0]];return keys[0];}return "";
   }
 
   /* Conservative consensus: a valid glucose value is not proof of a valid read.
      Never return partial digits or a single lucky crop. Uncertain photos stay blank. */
   function readLegacy(grab, fw, fh) {
-    var votes = {}, candidates = [], fracs = [1, .75, .55, .4], angs = [-2, -.5, 0, .5, 2];
+    var votes = {}, rows = {}, candidates = [], fracs = [1, .75, .55, .4], angs = [-12,-8.5,-8.1,-8,-7.9,-7.5,-4.5,-4.1,-4,-3.9,-3.5,-.5,-.1,0,.1,.5,3.5,3.9,4,4.1,4.5,7.5,7.9,8,8.1,8.5,12];
     for (var fi = 0; fi < fracs.length; fi++) {
       var cw = Math.max(1, (fw * fracs[fi]) | 0), ch = Math.max(1, (fh * fracs[fi]) | 0);
       for (var ai = 0; ai < angs.length; ai++) {
@@ -278,8 +279,8 @@
         // Clipped highlights can erase a leading digit. Do not infer through glare.
         if (bright / pixels.length > .005) continue;
         var r = runDetect(pixels, cw, ch);
-        if (!/^[0-9]{2,3}$/.test(r.out) || r.negq !== 0 || r.valid !== r.out.length || r.maxScore > .95 || r.minMargin < .55 || r.height < .16) continue;
-        candidates.push(r.out);
+        if (!/^[0-9]{2,3}$/.test(r.out) || r.negq !== 0 || r.valid !== r.out.length || r.maxScore > .95 || r.minMargin < .45 || r.height < .16) continue;
+        candidates.push(r.out);rows[r.out]=r.row;
         var v = votes[r.out] || (votes[r.out] = { count: 0, crops: {} });
         v.count++; v.crops[fi] = true;
       }
@@ -287,8 +288,8 @@
     var keys = Object.keys(votes);
     if (keys.length !== 1) return "";
     var v = votes[keys[0]];
-    return v.count >= 4 && Object.keys(v.crops).length >= 2 ? keys[0] : "";
+    if(v.count >= 4 && Object.keys(v.crops).length >= 2){lastRow=rows[keys[0]];return keys[0];}return "";
   }
-  function read(grab,fw,fh){var a=readAdaptive(grab,fw,fh),b=readLegacy(grab,fw,fh);return a&&b&&a!==b?"":a||b;}
-  return { read: read, readAdaptive: readAdaptive, runDetect: runDetect, detect: detect, otsu: otsu };
+  function read(grab,fw,fh){var a=readAdaptive(grab,fw,fh);if(a)return a;var f=Math.min(1,480/Math.max(fw,fh)),w=Math.round(fw*f),h=Math.round(fh*f);function small(cw,ch,ang){var sw=Math.max(1,Math.round(cw/f)),sh=Math.max(1,Math.round(ch/f)),src=grab(sw,sh,ang),out=new Uint8Array(cw*ch);for(var y=0;y<ch;y++)for(var x=0;x<cw;x++)out[y*cw+x]=src[Math.min(sh-1,Math.round(y/f))*sw+Math.min(sw-1,Math.round(x/f))];return out;}return readLegacy(small,w,h);}
+  return { read: read, readAdaptive: readAdaptive, getRow: function(){return lastRow;}, runDetect: runDetect, detect: detect, otsu: otsu };
 });
