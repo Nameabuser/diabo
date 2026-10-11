@@ -254,7 +254,8 @@ var preference='auto';try{preference=localStorage.getItem('diabo-theme-v2')||'au
     // Do not turn a partial/ambiguous read such as 1?7 into a different number.
     if (!/^[0-9]{2,3}$/.test(n)) n = "";
     if (n && window.Diabo.valid(n)) {
-      status.classList.add("hidden");
+      status.classList.remove("hidden");
+      status.textContent = "Suggested number - check it against your meter before saving.";
       numField.value = n;
     } else {
       status.classList.remove("hidden");
