@@ -114,5 +114,24 @@ choice.addEventListener('change',function(){var button=document.getElementById(c
 document.getElementById('add-reading').addEventListener('click',function(){choice.value='';choice.focus();});
 });
 </script>
+<script>
+(function(){
+var q=new URLSearchParams(location.search);
+if(!q.has('add')&&!q.has('text'))return;
+document.addEventListener('DOMContentLoaded',function(){
+var TAGS={fasting:'fasting',before:'before meal','before meal':'before meal',after:'after meal','after meal':'after meal'};
+var raw=q.has('add')?q.get('add'):q.get('text'),text=String(raw||''),low=text.toLowerCase(),m=low.match(/(?<!\d)\d{2,3}(?!\d)/),val=m?m[0]:'',tag='';
+var tp=(q.get('tag')||'').toLowerCase().trim();
+if(TAGS[tp])tag=TAGS[tp];else tag=/fasting/.test(low)?'fasting':/after/.test(low)?'after meal':/before/.test(low)?'before meal':'';
+function say(t){document.getElementById('toast-text').textContent=t;document.getElementById('undo').classList.add('hidden');var el=document.getElementById('toast');el.classList.remove('hidden');setTimeout(function(){el.classList.add('hidden');},7000);}
+history.replaceState(null,'',location.pathname);
+if(!window.Diabo.valid(val)){say('Could not read a reading from "'+text.slice(0,30)+'". Nothing saved.');return;}
+var last=window.Diabo.load()[0];
+if(last&&String(last.value)===String(+val)&&last.tag===tag&&Date.now()-last.ts<30000){say('Already saved '+(+val)+' just now');return;}
+if(window.Diabo.save(+val,tag)===false)return;
+say('Saved '+(+val)+(tag?' · '+tag:''));
+});
+})();
+</script>
 </body>
 </html>
