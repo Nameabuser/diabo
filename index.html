@@ -16,6 +16,7 @@
 <link rel="stylesheet" href="8-theme-v2.css?v=2">
 <style>
 .method-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 0}.method-row label{font-weight:600;font-size:15px}.method-row select{flex:0 1 62%;width:auto;min-width:0;min-height:44px;padding:8px 36px 8px 12px;border:1px solid var(--line);border-radius:12px;background-color:var(--bg);color:var(--ink);font:inherit;font-size:16px;touch-action:manipulation}.method-row select:focus-visible{outline:3px solid var(--accent);outline-offset:4px}
+#sync-form>label{display:block;font-size:14px;margin:12px 0}#sync-form input[type=email],#sync-form input[type=password]{display:block;width:100%;box-sizing:border-box;margin-top:6px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink);font:inherit;font-size:16px;padding:12px}#sync-form input[type=checkbox]{margin-right:6px;accent-color:var(--accent)}#sync-summary{max-width:55%;text-align:right}
 </style>
 </head>
 <body>
@@ -101,12 +102,13 @@
     <ul id="hist"></ul>
   </section>
   <details class="preferences"><summary>Personal target range <span>Optional</span></summary><p class="hint">Use the range given by your clinician. This only colours your log, not a diagnosis. No range is set by default.</p><form id="range-form"><div class="range-inputs"><label>Lower <input id="range-low" type="number" min="20" max="600" placeholder="mg/dL"></label><label>Upper <input id="range-high" type="number" min="20" max="600" placeholder="mg/dL"></label></div><button class="save" type="submit">Save range</button><button class="ghost" id="range-clear" type="button">Clear range</button><p id="range-status" class="hint" role="status"></p></form></details>
+<details class="preferences"><summary>Private sync <span id="sync-summary">Not connected</span></summary><p class="hint">Sign in with the same account in Safari and your home-screen app. Readings stay on this device and sync to your private Firebase account. Only enable this on your own device.</p><form id="sync-form"><label>Email <input id="sync-email" type="email" autocomplete="username" required></label><label>Password <input id="sync-password" type="password" autocomplete="current-password" required></label><label><input id="sync-trusted" type="checkbox" required> This is my own trusted device. Sync my existing readings.</label><button class="save" type="submit">Connect sync</button></form><button id="sync-out" class="ghost hidden" type="button">Sign out</button><p id="sync-status" class="hint" role="status">Local readings are unchanged.</p></details>
 </main><div id="toast" class="toast hidden" role="status"><span id="toast-text"></span><button id="undo" class="hidden" type="button">Undo</button></div>
 
-<footer>Tracker only - not medical advice. Readings stay on this device.</footer>
+<footer>Tracker only - not medical advice. Local readings stay on this device; private sync is optional.</footer>
 
 <script src="seg7.js?v=2" defer></script>
-<script src="7-diabo-v2.js?v=4" defer></script>
+<script src="7-diabo-v2.js?v=5" defer></script>
 <script>
 document.addEventListener('DOMContentLoaded',function(){
 var choice=document.getElementById('reading-method');
@@ -133,5 +135,6 @@ say('Saved '+(+val)+(tag?' · '+window.Diabo.tagLabel(tag):''));
 });
 })();
 </script>
+<script src="1-9-sync.js?v=1" defer></script>
 </body>
 </html>
