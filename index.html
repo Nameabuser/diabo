@@ -51,7 +51,7 @@
     <button class="mode" id="m-voice" type="button">
       <span class="mode-ic">🎙️</span>
       <span class="mode-tx">Voice</span>
-      <span class="mode-sub">say "137 before lunch"</span>
+      <span class="mode-sub">say "137 afternoon"</span>
     </button>
   </section>
 
@@ -82,7 +82,7 @@
 
   <section class="sheet hidden" id="sheet-voice">
     <div class="sheet-head"><h2>Voice</h2><button class="x" data-close type="button" aria-label="Close">✕</button></div>
-    <p class="hint" id="voice-hint">Say the number and when, like "137 before lunch" or "102 fasting".</p>
+    <p class="hint" id="voice-hint">Say the number and when, like "137 afternoon" or "102 morning".</p>
     <button class="save ghost" id="voice-go" type="button">Start listening</button>
     <div class="scan-status hidden" id="voice-status">Listening...</div>
     <div class="confirm hidden" id="voice-confirm">
@@ -106,7 +106,7 @@
 <footer>Tracker only - not medical advice. Readings stay on this device.</footer>
 
 <script src="seg7.js?v=2" defer></script>
-<script src="7-diabo-v2.js?v=2" defer></script>
+<script src="7-diabo-v2.js?v=4" defer></script>
 <script>
 document.addEventListener('DOMContentLoaded',function(){
 var choice=document.getElementById('reading-method');
@@ -119,17 +119,17 @@ document.getElementById('add-reading').addEventListener('click',function(){choic
 var q=new URLSearchParams(location.search);
 if(!q.has('add')&&!q.has('text'))return;
 document.addEventListener('DOMContentLoaded',function(){
-var TAGS={fasting:'fasting',before:'before meal','before meal':'before meal',after:'after meal','after meal':'after meal'};
+var TAGS={morning:'fasting',afternoon:'before meal',evening:'after meal',fasting:'fasting',before:'before meal','before meal':'before meal',after:'after meal','after meal':'after meal'};
 var raw=q.has('add')?q.get('add'):q.get('text'),text=String(raw||''),low=text.toLowerCase(),m=low.match(/(?<!\d)\d{2,3}(?!\d)/),val=m?m[0]:'',tag='';
 var tp=(q.get('tag')||'').toLowerCase().trim();
-if(TAGS[tp])tag=TAGS[tp];else tag=/fasting/.test(low)?'fasting':/after/.test(low)?'after meal':/before/.test(low)?'before meal':'';
+if(TAGS[tp])tag=TAGS[tp];else tag=window.Diabo.parseTag(low);
 function say(t){document.getElementById('toast-text').textContent=t;document.getElementById('undo').classList.add('hidden');var el=document.getElementById('toast');el.classList.remove('hidden');setTimeout(function(){el.classList.add('hidden');},7000);}
 history.replaceState(null,'',location.pathname);
 if(!window.Diabo.valid(val)){say('Could not read a reading from "'+text.slice(0,30)+'". Nothing saved.');return;}
 var last=window.Diabo.load()[0];
 if(last&&String(last.value)===String(+val)&&last.tag===tag&&Date.now()-last.ts<30000){say('Already saved '+(+val)+' just now');return;}
 if(window.Diabo.save(+val,tag)===false)return;
-say('Saved '+(+val)+(tag?' · '+tag:''));
+say('Saved '+(+val)+(tag?' · '+window.Diabo.tagLabel(tag):''));
 });
 })();
 </script>
