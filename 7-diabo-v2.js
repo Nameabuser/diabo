@@ -246,7 +246,9 @@ var preference='auto';try{preference=localStorage.getItem('diabo-theme-v2')||'au
   }
 
   function showResult(n) {
-    n = (n || "").replace(/\D/g, "");
+    n = String(n || "");
+    // Do not turn a partial/ambiguous read such as 1?7 into a different number.
+    if (!/^[0-9]{2,3}$/.test(n)) n = "";
     if (n && window.Diabo.valid(n)) {
       status.classList.add("hidden");
       numField.value = n;
