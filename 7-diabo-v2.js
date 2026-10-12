@@ -227,17 +227,15 @@ var preference='auto';try{preference=localStorage.getItem('diabo-theme-v2')||'au
 
   /* Live camera: crop the framing box from each video frame, read it, accept after agreeing reads. */
   var cam = document.getElementById("cam"), camWrap = document.getElementById("cam-wrap");
-  var camStream = null, camTimer = 0, camToken = 0, hist = [], camStart = 0;
+  var camStream = null, camTimer = 0, camFrame = null, camToken = 0, hist = [], camStart = 0;
   var work = document.createElement("canvas"), wctx = work.getContext("2d", { willReadFrequently: true });
   function stopCam() {
     camToken++; clearTimeout(camTimer);
-    if (camStream) {
-      // Keep the granted stream for this visit so reopening Scan does not re-prompt for camera access.
-      camStream.getTracks().forEach(function (t) { t.enabled = false; });
-      try { cam.pause(); } catch (e) {}
-    } else {
-      cam.srcObject = null;
-    }
+    if(camFrame!==null && cam.cancelVideoFrameCallback){cam.cancelVideoFrameCallback(camFrame);camFrame=null;}
+    if (camStream) camStream.getTracks().forEach(function(t){t.stop();});
+    camStream=null;
+    try { cam.pause(); } catch(e) {}
+    cam.srcObject=null;
     camWrap.classList.add("hidden");
   }
   function startCam() {
@@ -248,19 +246,6 @@ var preference='auto';try{preference=localStorage.getItem('diabo-theme-v2')||'au
     }
     var token = ++camToken;
     status.classList.remove("hidden"); status.textContent = "Opening camera...";
-    if (camStream) {
-      var held = camStream.getVideoTracks()[0];
-      if (held && held.readyState === "live") {
-        camStream.getTracks().forEach(function (t) { t.enabled = true; });
-        cam.srcObject = camStream; camWrap.classList.remove("hidden");
-        var rp = cam.play(); if (rp && rp.catch) rp.catch(function () {});
-        status.textContent = "Fit the meter screen inside the box and hold steady.";
-        confirmBox.classList.add("hidden"); camStart = Date.now();
-        loop(token);
-        return;
-      }
-      camStream = null;
-    }
     navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false }).then(function (s) {
       if (token !== camToken) { s.getTracks().forEach(function (t) { t.stop(); }); return; }
       camStream = s; cam.srcObject = s; camWrap.classList.remove("hidden");
@@ -292,7 +277,7 @@ var preference='auto';try{preference=localStorage.getItem('diabo-theme-v2')||'au
     var bw = cw * 0.8, bh = bw / 1.2, bx = cw * 0.1, by = (ch - bh) / 2;
     var sx = (bx + (vw * sc - cw) / 2) / sc, sy = (by + (vh * sc - ch) / 2) / sc, sw = bw / sc, sh = bh / sc;
     var ow = Math.min(400, Math.round(sw)), oh = Math.round(ow * sh / sw);
-    work.width = ow; work.height = oh;
+    if(work.width!==ow)work.width=ow; if(work.height!==oh)work.height=oh;
     wctx.drawImage(cam, sx, sy, sw, sh, 0, 0, ow, oh);
     var d = wctx.getImageData(0, 0, ow, oh).data, g = new Uint8Array(ow * oh);
     for (var i = 0; i < g.length; i++) g[i] = (d[i * 4] * 299 + d[i * 4 + 1] * 587 + d[i * 4 + 2] * 114) / 1000;
@@ -317,12 +302,15 @@ var preference='auto';try{preference=localStorage.getItem('diabo-theme-v2')||'au
       return;
     }
     if (Date.now() - camStart > 15000) status.textContent = "Still looking. Fill the box with the screen, reduce glare, keep steady.";
-    camTimer = setTimeout(function () { loop(token); }, 150);
+    // Read the next fresh frame without the old fixed 150 ms pause. Keep all agreement checks.
+    if(cam.requestVideoFrameCallback){camFrame=cam.requestVideoFrameCallback(function(){camFrame=null;loop(token);});}
+    else camTimer = setTimeout(function () { loop(token); }, 50);
   }
   document.getElementById("m-scan").addEventListener("click", function () { startCam(); });
   new MutationObserver(function () { if (document.getElementById("sheet-scan").classList.contains("hidden")) stopCam(); })
     .observe(document.getElementById("sheet-scan"), { attributes: true, attributeFilter: ["class"] });
   document.addEventListener("visibilitychange", function () { if (document.hidden) stopCam(); });
+  window.addEventListener("pagehide",stopCam);
   pick.addEventListener("click", stopCam);
 
   var fullW = 0, fullH = 0;
