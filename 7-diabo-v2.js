@@ -236,15 +236,26 @@ var preference='auto';try{preference=localStorage.getItem('diabo-theme-v2')||'au
   }
   function startCam() {
     stopCam();
-    hist = [];
+    hist = []; numField.value = ""; confirmBox.classList.add("hidden");
     if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.Seg7 && window.Seg7.readCrop)) {
       status.classList.remove("hidden"); status.textContent = "Camera not available here - choose a photo or type the number."; return;
     }
     var token = ++camToken;
     status.classList.remove("hidden"); status.textContent = "Opening camera...";
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false }).then(function (s) {
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false }).then(function (s) {
       if (token !== camToken) { s.getTracks().forEach(function (t) { t.stop(); }); return; }
       camStream = s; cam.srcObject = s; camWrap.classList.remove("hidden");
+      // Ask for continuous rear-camera focus when the browser exposes it.
+      // Unsupported iPhone constraints are ignored; never block camera startup.
+      var track = s.getVideoTracks()[0];
+      if (track && track.getCapabilities && track.applyConstraints) {
+        try {
+          var caps = track.getCapabilities(), advanced = {};
+          if (caps.focusMode && caps.focusMode.indexOf("continuous") >= 0) advanced.focusMode = "continuous";
+          if (caps.exposureMode && caps.exposureMode.indexOf("continuous") >= 0) advanced.exposureMode = "continuous";
+          if (Object.keys(advanced).length) track.applyConstraints({ advanced: [advanced] }).catch(function () {});
+        } catch (e) {}
+      }
       var p = cam.play(); if (p && p.catch) p.catch(function () {});
       status.textContent = "Fit the meter screen inside the box and hold steady.";
       confirmBox.classList.add("hidden"); camStart = Date.now();
