@@ -115,6 +115,9 @@
   document.querySelectorAll('[data-reading-date]').forEach(function(e){e.addEventListener('change',function(){readingDay=e.value;syncDateFields();});});
   document.querySelectorAll('[data-reading-day]').forEach(function(e){e.addEventListener('click',function(){readingDay=localDate(new Date());syncDateFields();});});
   window.Diabo.saveReading=function(value,tag){var d=new Date(readingDay+'T00:00:00'),ts=d.getTime();if(!readingDay||!Number.isSafeInteger(ts)||ts<=0||readingDay>localDate(new Date())||localDate(d)!==readingDay){document.querySelectorAll('.sheet:not(.hidden) [data-date-error]').forEach(function(e){e.textContent='Choose a valid date, not in the future.';e.classList.remove('hidden');e.scrollIntoView({block:'nearest'});});return false;}var old=baseTag(tag)?window.Diabo.load().filter(function(r){return readingDate(r)===readingDay&&baseTag(r.tag)===baseTag(tag);}):[];var result=window.Diabo.save(value,baseTag(tag)+'|date='+readingDay,ts,old.map(function(r){return r.id;}));if(result&&old.length)window.dispatchEvent(new CustomEvent('diabo-replaced',{detail:{old:old,next:window.Diabo.load().find(function(r){return readingDate(r)===readingDay&&baseTag(r.tag)===baseTag(tag);})}}));return result;};
+  
+var _sr=window.Diabo.saveReading;window.Diabo.saveReading=function(value,tag){if(!baseTag(tag)){var he=document.querySelector('.sheet:not(.hidden) [data-date-error]');if(he){he.textContent='Pick Morning, Afternoon or Evening first.';he.classList.remove('hidden');setTimeout(function(){he.classList.add('hidden');},3000);return false;}}return _sr(value,tag);};
+
   fillTags(document.querySelector('#sheet-methods [data-tags]'),function(){});
   window.Diabo.resetReadingDate();
 
