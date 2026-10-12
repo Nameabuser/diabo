@@ -16,7 +16,7 @@
 <link rel="icon" type="image/png" href="icons/2-2-icon-192.png">
 <title>Diabo</title>
 <!-- Method selector update v3 -->
-<link rel="stylesheet" href="8-theme-v2.css?v=28">
+<link rel="stylesheet" href="8-theme-v2.css?v=29">
 <style>
 .method-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 0}.method-row label{font-weight:600;font-size:15px}.method-row select{flex:0 1 62%;width:auto;min-width:0;min-height:44px;padding:8px 36px 8px 12px;border:1px solid var(--line);border-radius:12px;background-color:var(--bg);color:var(--ink);font:inherit;font-size:16px;touch-action:manipulation}.method-row select:focus-visible{outline:3px solid var(--accent);outline-offset:4px}
 #sync-form>label{display:block;font-size:14px;margin:12px 0}#sync-form input[type=email],#sync-form input[type=password]{display:block;width:100%;box-sizing:border-box;margin-top:6px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink);font:inherit;font-size:16px;padding:12px}#sync-form input[type=checkbox]{margin-right:6px;accent-color:var(--accent)}#sync-summary{max-width:55%;text-align:right}
@@ -29,7 +29,7 @@ body.app-locked{background:#000!important}body.app-locked>header,body.app-locked
 <section id="app-gate" aria-label="Sign in"><div id="gate-stack" class="gate-stack"><button id="gate-open" aria-label="Sign in" class="lock-trigger"><svg viewBox="0 0 120 120" width="108" height="108" fill="none" aria-hidden="true"><rect x="25" y="51" width="70" height="57" rx="18" stroke="#eeeeee" stroke-width="3" fill="#202020"/><path class="lock-shackle" d="M40 51V33a20 20 0 0 1 40 0v18" stroke="#eeeeee" stroke-width="3" stroke-linecap="round"/><circle cx="60" cy="76" r="5" fill="#cccccc"/><path d="M60 80v10" stroke="#cccccc" stroke-width="3" stroke-linecap="round"/></svg></button><div class="gate-caption">Welcome back</div><div class="lock-label">Tap to unlock</div></div><form id="gate-form" class="hidden"><label>Email<input id="gate-email" type="email" autocomplete="username" required></label><label>Password<input id="gate-password" type="password" autocomplete="current-password" required></label><button type="submit">Sign in</button><p id="gate-status" role="status"></p></form></section>
 <header>
   <div class="brand">
-    <svg class="drop" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C12 2 5 10.5 5 15.2C5 19.2 8.1 22 12 22C15.9 22 19 19.2 19 15.2C19 10.5 12 2 12 2Z" fill="#ff4757"/></svg>
+    <svg class="drop" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="#ff4757" stroke-width="1.7" stroke-linecap="round"><path d="M12 2.6C12 2.6 5.6 10.6 5.6 15.2C5.6 19 8.5 21.4 12 21.4C15.5 21.4 18.4 19 18.4 15.2C18.4 10.6 12 2.6 12 2.6Z"/><circle cx="9.7" cy="14.3" r="0.9" fill="#ff4757" stroke="none"/><circle cx="14.3" cy="14.3" r="0.9" fill="#ff4757" stroke="none"/><path d="M9.3 16.6C10.1 17.5 11 18 12 18C13 18 13.9 17.5 14.7 16.6"/></svg>
     <h1>Diabo</h1>
   </div>
   <button id="theme-toggle" class="icon-button" aria-label="Change colour theme" type="button">◐</button>
@@ -44,7 +44,7 @@ body.app-locked{background:#000!important}body.app-locked>header,body.app-locked
   </section>
   <button class="add-reading" id="add-reading" type="button"><span>＋</span> Add reading</button>
   <section class="trend"><div class="section-heading"><h2 id="chart-title">Your week</h2><span>Daily average · mg/dL</span></div><div class="chart-switch" aria-label="Chart period"><button type="button" data-chart-days="7" aria-pressed="true">Week</button><button type="button" data-chart-days="30" aria-pressed="false">Month</button></div><p id="chart-summary" class="hint"></p><p id="chart-date-range" class="hint"></p><div id="week-chart"></div><p id="week-caption" class="hint">Your readings will appear here.</p></section>
-  <section class="sheet hidden" id="sheet-methods"><div class="sheet-head"><h2>Add a reading</h2><button class="x" data-close type="button" aria-label="Close">✕</button></div><div class="reading-date"><div class="reading-date-heading">When was this reading?</div><div class="date-chips"><button type="button" data-reading-day="today" aria-pressed="true">Today</button></div><div class="reading-date-fields"><label>Date<input type="date" data-reading-date aria-label="Reading date"></label></div><div class="tags" data-tags aria-label="Reading period"></div><p class="hint">Pick an earlier date for a past reading.</p><p class="error hidden" data-date-error role="alert"></p></div><p class="hint">Choose what works for you.</p>
+  <section class="sheet hidden" id="sheet-methods"><div class="sheet-head"><h2>Add a reading</h2><button class="x" data-close type="button" aria-label="Close">✕</button></div><div class="reading-date"><div class="reading-date-fields"><label>Date<input type="date" data-reading-date aria-label="Reading date"></label></div><div class="tags" data-tags aria-label="Reading period"></div><p class="hint">Pick an earlier date for a past reading.</p><p class="error hidden" data-date-error role="alert"></p></div><p class="hint">Choose what works for you.</p>
   <div class="method-row"><label for="reading-method">Method</label><select id="reading-method" aria-label="Reading method"><option value="" selected disabled>Choose method</option><option value="m-scan">Scan meter</option><option value="m-pad">Number pad</option><option value="m-voice">Voice</option></select></div>
   <section class="modes hidden" aria-hidden="true" id="modes">
     <button class="mode" id="m-scan" type="button">
@@ -66,14 +66,14 @@ body.app-locked{background:#000!important}body.app-locked>header,body.app-locked
 
   </section>
   <section class="sheet hidden" id="sheet-pad">
-    <div class="sheet-head"><h2>Number pad</h2><button class="x" data-close type="button" aria-label="Close">✕</button></div><div class="reading-date"><div class="reading-date-heading">When was this reading?</div><div class="date-chips"><button type="button" data-reading-day="today" aria-pressed="true">Today</button></div><div class="reading-date-fields"><label>Date<input type="date" data-reading-date aria-label="Reading date"></label></div><div class="tags" data-tags aria-label="Reading period"></div><p class="hint">Pick an earlier date for a past reading.</p><p class="error hidden" data-date-error role="alert"></p></div>
+    <div class="sheet-head"><h2>Number pad</h2><button class="x" data-close type="button" aria-label="Close">✕</button></div><div class="reading-date"><div class="reading-date-fields"><label>Date<input type="date" data-reading-date aria-label="Reading date"></label></div><div class="tags" data-tags aria-label="Reading period"></div><p class="hint">Pick an earlier date for a past reading.</p><p class="error hidden" data-date-error role="alert"></p></div>
     <div class="pad-out"><span id="pad-val">0</span><span class="unit">mg/dL</span></div>
     <div class="pad" id="pad"></div><p class="error hidden" id="pad-error" role="alert">Enter a number from 20 to 600 mg/dL.</p>
     <button class="save" id="pad-save" type="button">Save</button>
   </section>
 
   <section class="sheet hidden" id="sheet-scan">
-    <div class="sheet-head"><h2>Scan meter</h2><button class="x" data-close type="button" aria-label="Close">✕</button></div><div class="reading-date"><div class="reading-date-heading">When was this reading?</div><div class="date-chips"><button type="button" data-reading-day="today" aria-pressed="true">Today</button></div><div class="reading-date-fields"><label>Date<input type="date" data-reading-date aria-label="Reading date"></label></div><div class="tags" data-tags aria-label="Reading period"></div><p class="hint">Pick an earlier date for a past reading.</p><p class="error hidden" data-date-error role="alert"></p></div>
+    <div class="sheet-head"><h2>Scan meter</h2><button class="x" data-close type="button" aria-label="Close">✕</button></div><div class="reading-date"><div class="reading-date-fields"><label>Date<input type="date" data-reading-date aria-label="Reading date"></label></div><div class="tags" data-tags aria-label="Reading period"></div><p class="hint">Pick an earlier date for a past reading.</p><p class="error hidden" data-date-error role="alert"></p></div>
     <p class="hint" id="scan-hint">Point the camera at the meter and fit its screen inside the box. It reads the number by itself. Nothing leaves your phone.</p>
     <div class="cam-wrap hidden" id="cam-wrap"><video id="cam" playsinline muted autoplay></video><div class="cam-box"></div></div>
     <input type="file" id="scan-input" accept="image/*" class="hidden">
@@ -89,7 +89,7 @@ body.app-locked{background:#000!important}body.app-locked>header,body.app-locked
   </section>
 
   <section class="sheet hidden" id="sheet-voice">
-    <div class="sheet-head"><h2>Voice</h2><button class="x" data-close type="button" aria-label="Close">✕</button></div><div class="reading-date"><div class="reading-date-heading">When was this reading?</div><div class="date-chips"><button type="button" data-reading-day="today" aria-pressed="true">Today</button></div><div class="reading-date-fields"><label>Date<input type="date" data-reading-date aria-label="Reading date"></label></div><div class="tags" data-tags aria-label="Reading period"></div><p class="hint">Pick an earlier date for a past reading.</p><p class="error hidden" data-date-error role="alert"></p></div>
+    <div class="sheet-head"><h2>Voice</h2><button class="x" data-close type="button" aria-label="Close">✕</button></div><div class="reading-date"><div class="reading-date-fields"><label>Date<input type="date" data-reading-date aria-label="Reading date"></label></div><div class="tags" data-tags aria-label="Reading period"></div><p class="hint">Pick an earlier date for a past reading.</p><p class="error hidden" data-date-error role="alert"></p></div>
     <p class="hint" id="voice-hint">Say the number and when, like "137 afternoon" or "102 morning".</p>
     <button class="save ghost" id="voice-go" type="button">Start listening</button>
     <div class="scan-status hidden" id="voice-status">Listening...</div>
@@ -110,7 +110,7 @@ body.app-locked{background:#000!important}body.app-locked>header,body.app-locked
 <footer>Tracker only - not medical advice. Local readings stay on this device; private sync is optional.</footer>
 
 <script src="seg7.js?v=12" defer></script>
-<script src="7-diabo-v2.js?v=26" defer></script>
+<script src="7-diabo-v2.js?v=27" defer></script>
 <script>
 document.addEventListener('DOMContentLoaded',function(){
 var choice=document.getElementById('reading-method');
