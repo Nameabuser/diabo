@@ -296,7 +296,7 @@
     if(v.count<5||v.count/total<.98||Object.keys(v.thresholds).length<2||Object.keys(v.radii).length<2)return '';
     lastRow=rows[keys[0]];return keys[0];
   }
-  function meterRow(ink,w,h){
+  function meterRow(ink,w,h,lax){
     var ys=runsFrom(colsumBandTranspose(ink,w,h),1);ys=mergeRuns(ys,5);if(!ys.length)return null;ys.sort(function(a,b){return b[1]-b[0]-(a[1]-a[0]);});
     var y0=ys[0][0],y1=ys[0][1],bh=y1-y0;
     var cs=colsumBand(ink,w,y0,y1),runs=mergeRuns(runsFrom(cs,1),3);
@@ -305,7 +305,7 @@
     var out='',rowHeight=bh;
     for(var k=0;k<runs.length;k++){
       var x0=runs[k][0],x1=runs[k][1],bw=x1-x0;var ey0=h,ey1=0;for(var yy=0;yy<h;yy++)for(var xx=x0;xx<x1;xx++)if(ink[yy*w+xx]){ey0=Math.min(ey0,yy);ey1=Math.max(ey1,yy+1);}if(ey1-ey0<12||ey1-ey0<rowHeight*.72)return null;y0=ey0;y1=ey1;bh=y1-y0;
-      if(bw<bh*.24){if(bw<bh*.06||bw>bh*.18)return null;out+='1';continue;}
+      if(bw<bh*.24){if(bw<bh*.06||bw>bh*(lax?.23:.18))return null;out+='1';continue;}
       if(bw/bh<.32||bw/bh>.62)return null;
       function dens(fx0,fx1,fy0,fy1){var hit=0,n=0;for(var y=Math.floor(y0+bh*fy0);y<Math.ceil(y0+bh*fy1);y++)for(var x=Math.floor(x0+bw*fx0);x<Math.ceil(x0+bw*fx1);x++){hit+=ink[y*w+x]||0;n++;}return hit/n;}
       var ds=[dens(.25,.75,0,.13),dens(.72,1,.15,.4),dens(.72,1,.6,.85),dens(.25,.75,.87,1),dens(0,.28,.6,.85),dens(0,.28,.15,.4),dens(.25,.75,.43,.57)],bits=ds.map(function(d){return d>.3?1:0;}),digit=null;
@@ -316,6 +316,108 @@
   }
   function colsumBandTranspose(ink,w,h){var ys=new Int32Array(h);for(var y=0;y<h;y++)for(var x=0;x<w;x++)ys[y]+=ink[y*w+x];return ys;}
 
+
+
+  // ---- Live-camera row reader (v11): segment clustering, no photo-specific values. ----
+  // Digits are found as clusters of stroke-sized dark pieces, so thin or blurred digits whose segments
+  // do not touch still form one digit row, at any distance. Anything unclear returns blank.
+  function percentile(arr,p){var a=Array.prototype.slice.call(arr).sort(function(x,y){return x-y;});return a[Math.min(a.length-1,Math.max(0,Math.floor(a.length*p)))];}
+  function clusterRows(cs,w,h){
+    var seg=cs.filter(function(c){var L=Math.max(c.w,c.h),S=Math.min(c.w,c.h);return L>=.06*h&&L<=.5*h&&S>=2&&c.pts.length>=.12*L*S&&c.w<=.3*w&&c.x>0&&c.y>0&&c.x+c.w<w&&c.y+c.h<h;});
+    var par=seg.map(function(_,i){return i;});
+    function f(i){while(par[i]!==i){par[i]=par[par[i]];i=par[i];}return i;}
+    for(var i=0;i<seg.length;i++)for(var j=i+1;j<seg.length;j++){
+      var a=seg[i],b=seg[j],L=Math.max(a.w,a.h,b.w,b.h);
+      var gx=Math.max(a.x,b.x)-Math.min(a.x+a.w,b.x+b.w),gy=Math.max(a.y,b.y)-Math.min(a.y+a.h,b.y+b.h);
+      if(gx<=.6*Math.min(Math.max(a.w,a.h),Math.max(b.w,b.h))&&gy<=.05*h+2)par[f(i)]=f(j);
+    }
+    var groups={};
+    seg.forEach(function(c,i){var r=f(i);(groups[r]||(groups[r]=[])).push(c);});
+    var out=[];
+    Object.keys(groups).forEach(function(k){
+      var m=groups[k];if(m.length<4)return;
+      var mL=0;m.forEach(function(c){mL=Math.max(mL,c.w,c.h);});
+      var bt=h,bb=0;m.forEach(function(c){if(Math.max(c.w,c.h)>=.55*mL){bt=Math.min(bt,c.y);bb=Math.max(bb,c.y+c.h);}});
+      // Drop stray pieces (units, labels) whose centre is outside the main digit band.
+      m=m.filter(function(c){var cy=c.y+c.h/2;return cy>=bt-.05*(bb-bt)&&cy<=bb+.05*(bb-bt);});
+      if(m.length<4)return;
+      var x0=w,x1=0,y0=h,y1=0,pts=0;m.forEach(function(c){x0=Math.min(x0,c.x);x1=Math.max(x1,c.x+c.w);y0=Math.min(y0,c.y);y1=Math.max(y1,c.y+c.h);pts+=c.pts.length;});
+      var bw=x1-x0,bh=y1-y0;
+      if(bh<.1*h||bh>.65*h||bw/bh<.9||bw/bh>3.3)return;
+      out.push({x:x0,y:y0,w:bw,h:bh,m:m,pts:pts});
+    });
+    out.sort(function(a,b){return b.h*b.w-a.h*a.w;});
+    return out;
+  }
+  function slotBlank(g,w,h,r){
+    // The slot where a hidden leading digit would sit must be clean, bright LCD plate inside the frame.
+    var sw=Math.round(.5*r.h),gap=Math.round(.1*r.h),xa=r.x-gap-sw,xb=r.x-gap,ya=r.y+Math.round(.4*r.h),yb=r.y+r.h-Math.round(.05*r.h);
+    if(xa<3||xb>w-3||ya<0||yb>h)return false;
+    var ref=[],x,y;
+    for(y=r.y;y<r.y+r.h;y++)for(x=r.x;x<r.x+r.w;x++)ref.push(g[y*w+x]);
+    var plate=percentile(ref,.8),sum=0,n=0,low=0;
+    for(y=ya;y<yb;y++)for(x=xa;x<xb;x++){
+      var v=0,c=0;for(var dy=-1;dy<=1;dy++)for(var dx=-1;dx<=1;dx++){var yy=Math.min(h-1,Math.max(0,y+dy)),xx=Math.min(w-1,Math.max(0,x+dx));v+=g[yy*w+xx];c++;}
+      v/=c;sum+=v;n++;if(v<plate*.86||v>plate*1.2)low++;
+    }
+    return n>0&&sum/n>=plate*.93&&sum/n<=plate*1.1&&low<=.004*n;
+  }
+  function readLive(g,w,h){
+    lastRow=null;
+    var votes={},rows={},total=0,rowLen={};
+    var early=false;
+    for(var ri=0;ri<4&&!early;ri++)for(var ti=0;ti<3&&!early;ti++){
+      var rad=Math.max(5,Math.round([.02,.035,.05,.07][ri]*w)),ink=localInk(g,w,h,rad,[6,10,14][ti]),cs=components(ink,w,h);
+      var cl=clusterRows(cs,w,h).slice(0,2);
+      if(!cl.length)continue;
+      // The tallest digit-like cluster is the reading. A second, equally tall cluster means we cannot tell which one is it.
+      if(cl.length>1&&cl[1].h>=.8*cl[0].h&&Math.abs(cl[1].y-cl[0].y)>.5*cl[0].h)continue;
+      var c=cl[0],used={};c.m.forEach(function(k){used[k.pts[0]]=1;});
+      // Guards: no cut-off digit at the frame edge, no stroke-sized ink beside the row that was not part of it, room on the right.
+      if(c.x<2||c.y<2||c.y+c.h>h-2||c.x+c.w>w-.12*c.h)continue;
+      if(c.x+c.w>w-.3*c.h){
+        // Little room right of the row: the LCD edge (dark bezel) must be visible there, so no digit is cut off by the frame.
+        var plate0=percentile(Array.prototype.filter.call(g.subarray(0),function(_,ix){var yy0=(ix/w)|0,xx0=ix%w;return yy0>=c.y&&yy0<c.y+c.h&&xx0>=c.x&&xx0<c.x+c.w;}),.8),dark=0;
+        for(var cx=c.x+c.w+2;cx<w;cx++){var sm=0,sn2=0;for(var cy=c.y+Math.round(.3*c.h);cy<c.y+Math.round(.9*c.h);cy++){sm+=g[cy*w+cx];sn2++;}if(sm/sn2<.6*plate0)dark++;}
+        if(dark<3)continue;
+      }
+      if(c.x<.5*c.h+2){
+        // Little room left of the row: the LCD edge (dark bezel) must be visible there, so the first digit is not cut by the frame
+        // (the right half of a 3, 5, 6 or 8 can look like a 1).
+        var lp=percentile(Array.prototype.filter.call(g,function(_,ix){var y2=(ix/w)|0,x2=ix%w;return y2>=c.y&&y2<c.y+c.h&&x2>=c.x&&x2<c.x+c.w;}),.8),ld=0;
+        for(var lx=0;lx<c.x-2;lx++){var lm=0,ln=0;for(var ly=c.y+Math.round(.3*c.h);ly<c.y+Math.round(.9*c.h);ly++){lm+=g[ly*w+lx];ln++;}if(lm/ln<.6*lp)ld++;}
+        if(ld<3)continue;
+      }
+      var lost=false;
+      cs.forEach(function(k){
+        if(used[k.pts[0]]||lost)return;
+        var cyc=k.y+k.h/2;if(cyc<c.y-.1*c.h||cyc>c.y+c.h*1.1)return;
+        if(k.x+k.w>=c.x-c.h*1.2&&k.x<=c.x+c.w+c.h*.55&&(k.x+k.w<c.x||k.x>c.x+c.w)&&k.pts.length>=.015*c.h*c.h&&k.h>=.12*c.h&&k.h<=1.1*c.h)lost=true;
+      });
+      if(lost)continue;
+      var pad=10,sw=c.w+pad*2,sh=c.h+pad*2,sub=new Uint8Array(sw*sh);
+      c.m.forEach(function(k){k.pts.forEach(function(p){var y=(p/w)|0,x=p%w;sub[(y-c.y+pad)*sw+x-c.x+pad]=1;});});
+      // Fill thin gaps: re-threshold the row with Otsu so segment thickness is consistent.
+      var crop=new Uint8Array(c.w*c.h),yy,xx;
+      for(yy=0;yy<c.h;yy++)for(xx=0;xx<c.w;xx++)crop[yy*c.w+xx]=g[(c.y+yy)*w+c.x+xx];
+      var thr=otsu(crop)+[0,-4,4][ti],ink2=new Uint8Array(sw*sh);
+      for(yy=0;yy<c.h;yy++)for(xx=0;xx<c.w;xx++)ink2[(yy+pad)*sw+xx+pad]=(crop[yy*c.w+xx]<=thr&&sub[(yy+pad)*sw+xx+pad])?1:0;
+      for(var ai=0;ai<7;ai++)for(var si=0;si<11;si++){
+        var a=[-9,-6,-3,0,3,6,9][ai]*Math.PI/180,shear=[-.32,-.28,-.24,-.2,-.16,-.12,-.08,-.04,0,.04,.08][si],dst=new Uint8Array(sw*sh),co=Math.cos(a),sn=Math.sin(a);
+        for(yy=0;yy<sh;yy++)for(xx=0;xx<sw;xx++){var dx=xx-sw/2,dy=yy-sh/2,sx=Math.round(co*dx+sn*dy+shear*dy+sw/2),sy=Math.round(-sn*dx+co*dy+sh/2);if(sx>=0&&sx<sw&&sy>=0&&sy<sh)dst[yy*sw+xx]=ink2[sy*sw+sx];}
+        var r=meterRow(dst,sw,sh,true);
+        if(r&&(r.out.length===2)&&!slotBlank(g,w,h,c))r=null;
+        if(r){var v=votes[r.out]||(votes[r.out]={count:0,cellset:{},cells:0});v.count++;if(!v.cellset[ri+'_'+ti]){v.cellset[ri+'_'+ti]=1;v.cells++;}rows[r.out]={ink:dst,w:sw,h:sh};}
+        total++;
+      }
+      var ek=Object.keys(votes);if(ek.length===1&&votes[ek[0]].count>=12&&votes[ek[0]].cells>=3)early=true;
+    }
+    var keys=Object.keys(votes).sort(function(a,b){return votes[b].count-votes[a].count;});
+    if(!keys.length)return '';
+    var v0=votes[keys[0]],all=0;keys.forEach(function(k){all+=votes[k].count;});
+    if(v0.count<4||v0.count/all<.98||v0.cells<2)return '';
+    lastRow=rows[keys[0]];return keys[0];
+  }
 
   // Live-camera reader: g is a gray crop that the user framed around the LCD. Scale-normalised, no photo-specific values.
   function readCropSingle(g0,w0,h0,whole){
@@ -370,18 +472,12 @@
     lastRow=rows[keys[0]];return keys[0];
   }
  function readCrop(g,w,h){
-    // The framing box may contain a darker LCD beside a bright bezel. Try the
-    // entire framed screen too, but reject disagreement between complete reads.
-    var a=readCropSingle(g,w,h,false),ar=lastRow;
-    var b=readCropSingle(g,w,h,true),br=lastRow;
-    if(a&&b&&a!==b){lastRow=null;return '';}
-    // Wide-scene localisation cannot prove that a missing leading digit is
-    // empty LCD space. Only use complete three-digit rows in this fallback;
-    // two-digit readings still require the framed-LCD reader above.
-    var c=readMeter(function(){return g;},w,h,true),cr=lastRow;
-    if(c.length!==3)c="";
-    if(c&&((a&&a!==c)||(b&&b!==c))){lastRow=null;return "";}
-    lastRow=c?cr:(a?ar:br);return c||a||b;
+    // Source of a value is only the live row reader. The older framed-LCD readers can only veto it.
+    var c=readLive(g,w,h),cr=lastRow;
+    if(!c)return '';
+    var a=readCropSingle(g,w,h,false),b=readCropSingle(g,w,h,true);
+    if((a&&a!==c)||(b&&b!==c)){lastRow=null;return '';}
+    lastRow=cr;return c;
   }
- return {readCrop:readCrop,read:readMeter,getRow:function(){return lastRow;}};
+ return {readLive:readLive,readCrop:readCrop,read:readMeter,getRow:function(){return lastRow;}};
 });
