@@ -362,6 +362,16 @@
     }
     return n>0&&sum/n>=plate*.93&&sum/n<=plate*1.1&&low<=.004*n;
   }
+  var lastBox=null;
+  function glareHides(g,w,h){
+    var c=lastBox;if(!c)return true;
+    var p=Math.round(.2*c.h),x0=Math.max(0,Math.floor(c.x-p)),x1=Math.min(w,Math.ceil(c.x+c.w+p)),y0=Math.max(0,Math.floor(c.y-p)),y1=Math.min(h,Math.ceil(c.y+c.h+p)),a=[],x,y;
+    for(y=y0;y<y1;y++)for(x=x0;x<x1;x++)a.push(g[y*w+x]);
+    if(!a.length)return true;
+    var plate=percentile(a,.75),n=0;
+    for(var i=0;i<a.length;i++)if(a[i]>plate+40||a[i]>=250)n++;
+    return n>.015*a.length;
+  }
   function readLive(g,w,h){
     lastRow=null;
     var votes={},rows={},total=0,rowLen={};
@@ -372,7 +382,7 @@
       if(!cl.length)continue;
       // The tallest digit-like cluster is the reading. A second, equally tall cluster means we cannot tell which one is it.
       if(cl.length>1&&cl[1].h>=.8*cl[0].h&&Math.abs(cl[1].y-cl[0].y)>.5*cl[0].h)continue;
-      var c=cl[0],used={};c.m.forEach(function(k){used[k.pts[0]]=1;});
+      var c=cl[0],used={};lastBox=c;c.m.forEach(function(k){used[k.pts[0]]=1;});
       // Guards: no cut-off digit at the frame edge, no stroke-sized ink beside the row that was not part of it, room on the right.
       if(c.x<2||c.y<2||c.y+c.h>h-2||c.x+c.w>w-.12*c.h)continue;
       if(c.x+c.w>w-.3*c.h){
@@ -475,6 +485,7 @@
     // Source of a value is only the live row reader. The older framed-LCD readers can only veto it.
     var c=readLive(g,w,h),cr=lastRow;
     if(!c)return '';
+    if(glareHides(g,w,h)){lastRow=null;return '';}
     var a=readCropSingle(g,w,h,false),b=readCropSingle(g,w,h,true);
     if((a&&a!==c)||(b&&b!==c)){lastRow=null;return '';}
     lastRow=cr;return c;
