@@ -249,16 +249,16 @@
   var lastRow=null;
   // Local illumination, component-size row localisation, then deskew/shear.
   // No recognised value or photo coordinates are built into this reader.
-  function readMeter(grab,fw,fh){
+  function readMeter(grab,fw,fh,live){
     lastRow=null;
     var src=grab(fw,fh,0),f=Math.min(1,700/Math.max(fw,fh)),w=Math.round(fw*f),h=Math.round(fh*f),g=new Uint8Array(w*h);
     for(var y=0;y<h;y++)for(var x=0;x<w;x++)g[y*w+x]=src[Math.min(fh-1,Math.round(y/f))*fw+Math.min(fw-1,Math.round(x/f))];
     var scale=Math.max(w,h)/700;var votes={},rows={},attempts=[];
     for(var ri=0;ri<3;ri++)for(var ti=0;ti<3;ti++){
       var ink=localInk(g,w,h,Math.max(4,Math.round([14,22,30][ri]*scale)),[6,10,14][ti]),cs=components(ink,w,h),clean=new Uint8Array(w*h);
-      var eligible=cs.filter(function(c){return c.w>=2*scale&&c.w<=w*.12&&c.h>=15*scale&&c.h<=h*.13&&c.pts.length>=65*scale*scale&&c.pts.length/(c.w*c.h)>.18;});
+      var eligible=cs.filter(function(c){return c.w>=2*scale&&c.w<=w*(live?.2:.12)&&c.h>=15*scale&&c.h<=h*(live?.5:.13)&&c.pts.length>=65*scale*scale&&c.pts.length/(c.w*c.h)>.18;});
       var groups=[];
-      eligible.forEach(function(seed){var cy=seed.y+seed.h/2;var row=eligible.filter(function(c){return Math.abs(c.y+c.h/2-cy)<Math.max(c.h,seed.h)*.8&&Math.abs(c.x-seed.x)<seed.h*5;});var x0=w,x1=0,y0=h,y1=0;row.forEach(function(c){x0=Math.min(x0,c.x);x1=Math.max(x1,c.x+c.w);y0=Math.min(y0,c.y);y1=Math.max(y1,c.y+c.h);});if(x1-x0>25*scale&&x1-x0<w*.5&&y1-y0>=25*scale&&y1-y0<h*.13)groups.push({x:x0,y:y0,w:x1-x0,h:y1-y0});});
+      eligible.forEach(function(seed){var cy=seed.y+seed.h/2;var row=eligible.filter(function(c){return Math.abs(c.y+c.h/2-cy)<Math.max(c.h,seed.h)*.8&&Math.abs(c.x-seed.x)<seed.h*5;});var x0=w,x1=0,y0=h,y1=0;row.forEach(function(c){x0=Math.min(x0,c.x);x1=Math.max(x1,c.x+c.w);y0=Math.min(y0,c.y);y1=Math.max(y1,c.y+c.h);});if(x1-x0>25*scale&&x1-x0<w*.5&&y1-y0>=25*scale&&y1-y0<h*(live?.5:.13))groups.push({x:x0,y:y0,w:x1-x0,h:y1-y0});});
       groups=groups.filter(function(a){return !groups.some(function(b){return b!==a&&b.w>a.w*1.15&&a.x>=b.x-3&&a.x+a.w<=b.x+b.w+3&&Math.abs(a.y+a.h/2-b.y-b.h/2)<b.h*.3;});});groups.sort(function(a,b){return b.h-a.h;});
       groups=groups.filter(function(c,i){return !i||!groups.slice(0,i).some(function(b){return Math.abs(b.x-c.x)<5&&Math.abs(b.y-c.y)<5;});});
       for(var gi=0;gi<groups.length;gi++){
@@ -269,7 +269,7 @@
           var n=0,ymin=h,ymax=0;
           cs.forEach(function(k){
             if(k.x<sd[0]||k.x+k.w>sd[1]||k.y<c.y-c.h*.4||k.y+k.h>c.y+c.h*1.4||k.h>c.h*1.3||k.w>c.h)return;
-            n+=k.pts.length;if(k.y<ymin)ymin=k.y;if(k.y+k.h>ymax)ymax=k.y+k.h;
+            if(live){ k.pts.forEach(function(p){var y=(p/w)|0;if(y<c.y||y>=c.y+c.h)return;n++;ymin=Math.min(ymin,y);ymax=Math.max(ymax,y+1);}); } else {n+=k.pts.length;if(k.y<ymin)ymin=k.y;if(k.y+k.h>ymax)ymax=k.y+k.h;}
           });
           if(n>=18*scale*scale&&ymax-ymin>=c.h*.45)lostDigit=true;
         });
@@ -280,10 +280,11 @@
         for(var yy=0;yy<c.h;yy++)for(var xx=0;xx<c.w;xx++)crop[yy*c.w+xx]=g[(c.y+yy)*w+c.x+xx];
         var thr=otsu(crop)+[0,-4,4][ti];
         for(yy=0;yy<c.h;yy++)for(xx=0;xx<c.w;xx++)sub[(yy+pad)*sw+xx+pad]=crop[yy*c.w+xx]<=thr?1:0;
-        for(var ai=0;ai<5;ai++)for(var si=0;si<3;si++){
-          var a=[-6,-3,0,3,6][ai]*Math.PI/180,shear=[-.16,-.08,0][si],dst=new Uint8Array(sw*sh),co=Math.cos(a),sn=Math.sin(a);
+        for(var ai=0;ai<(live?9:5);ai++)for(var si=0;si<(live?11:3);si++){
+          var a=(live?[-12,-9,-6,-3,0,3,6,9,12]:[-6,-3,0,3,6])[ai]*Math.PI/180,shear=(live?[-.32,-.28,-.24,-.20,-.16,-.12,-.08,-.04,0,.04,.08]:[-.16,-.08,0])[si],dst=new Uint8Array(sw*sh),co=Math.cos(a),sn=Math.sin(a);
           for(yy=0;yy<sh;yy++)for(xx=0;xx<sw;xx++){var dx=xx-sw/2,dy=yy-sh/2,sx=Math.round(co*dx+sn*dy+shear*dy+sw/2),sy=Math.round(-sn*dx+co*dy+sh/2);if(sx>=0&&sx<sw&&sy>=0&&sy<sh)dst[yy*sw+xx]=sub[sy*sw+sx];}
           var r=meterRow(dst,sw,sh);
+          if(live && r && (c.w/c.h<1.35 || c.w/c.h>2.7))r=null;
           if(r){var v=votes[r.out]||(votes[r.out]={count:0,thresholds:{},radii:{}});v.count++;v.thresholds[ti]=true;v.radii[ri]=true;rows[r.out]={ink:dst,w:sw,h:sh};}
         }
       }
@@ -374,7 +375,13 @@
     var a=readCropSingle(g,w,h,false),ar=lastRow;
     var b=readCropSingle(g,w,h,true),br=lastRow;
     if(a&&b&&a!==b){lastRow=null;return '';}
-    lastRow=a?ar:br;return a||b;
+    // Wide-scene localisation cannot prove that a missing leading digit is
+    // empty LCD space. Only use complete three-digit rows in this fallback;
+    // two-digit readings still require the framed-LCD reader above.
+    var c=readMeter(function(){return g;},w,h,true),cr=lastRow;
+    if(c.length!==3)c="";
+    if(c&&((a&&a!==c)||(b&&b!==c))){lastRow=null;return "";}
+    lastRow=c?cr:(a?ar:br);return c||a||b;
   }
  return {readCrop:readCrop,read:readMeter,getRow:function(){return lastRow;}};
 });
