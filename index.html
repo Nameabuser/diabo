@@ -12,8 +12,8 @@
 <script>try{var r=document.documentElement,p=localStorage.getItem('diabo-theme-v2')||'auto',l=p==='light'||(p==='auto'&&matchMedia('(prefers-color-scheme: light)').matches);r.classList.toggle('light-ready',l);if(localStorage.getItem('diabo-owner-device-v1')==='yes'){r.classList.add('owner-ready');document.querySelector('meta[name="theme-color"]').content=l?'#fafafa':'#151515';}}catch(e){}</script>
 <link rel="preload" href="1-9-sync.js?v=9" as="script">
 <link rel="manifest" href="manifest.webmanifest?v=2">
-<link rel="apple-touch-icon" href="icons/1-1-apple-touch-icon.png">
-<link rel="icon" type="image/png" href="icons/2-2-icon-192.png">
+<link rel="apple-touch-icon" href="icons/1-1-apple-touch-icon.png?v=3">
+<link rel="icon" type="image/png" href="icons/2-2-icon-192.png?v=3">
 <title>Diabo</title>
 <!-- Method selector update v3 -->
 <link rel="stylesheet" href="8-theme-v2.css?v=31">
@@ -29,7 +29,7 @@ body.app-locked{background:#000!important}body.app-locked>header,body.app-locked
 <section id="app-gate" aria-label="Sign in"><div id="gate-stack" class="gate-stack"><button id="gate-open" aria-label="Sign in" class="lock-trigger"><svg viewBox="0 0 120 120" width="108" height="108" fill="none" aria-hidden="true"><rect x="25" y="51" width="70" height="57" rx="18" stroke="#eeeeee" stroke-width="3" fill="#202020"/><path class="lock-shackle" d="M40 51V33a20 20 0 0 1 40 0v18" stroke="#eeeeee" stroke-width="3" stroke-linecap="round"/><circle cx="60" cy="76" r="5" fill="#cccccc"/><path d="M60 80v10" stroke="#cccccc" stroke-width="3" stroke-linecap="round"/></svg></button><div class="gate-caption">Welcome back</div><div class="lock-label">Tap to unlock</div></div><form id="gate-form" class="hidden"><label>Email<input id="gate-email" type="email" autocomplete="username" required></label><label>Password<input id="gate-password" type="password" autocomplete="current-password" required></label><button type="submit">Sign in</button><p id="gate-status" role="status"></p></form></section>
 <header>
   <div class="brand">
-    <svg class="drop" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C12 2 5 10.5 5 15.2C5 19.2 8.1 22 12 22C15.9 22 19 19.2 19 15.2C19 10.5 12 2 12 2Z" fill="#ff4757"/></svg>
+    <svg class="drop" viewBox="40 20 100 145" aria-hidden="true" style="border-radius:4px"><image href="icons/1-1-apple-touch-icon.png?v=3" width="180" height="180"/></svg>
     <h1>Diabo</h1>
   </div>
   <button id="theme-toggle" class="icon-button" aria-label="Change colour theme" type="button">◐</button>
