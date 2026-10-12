@@ -304,5 +304,58 @@
   }
   function colsumBandTranspose(ink,w,h){var ys=new Int32Array(h);for(var y=0;y<h;y++)for(var x=0;x<w;x++)ys[y]+=ink[y*w+x];return ys;}
 
- return {read:readMeter,getRow:function(){return lastRow;}};
+
+  // Live-camera reader: g is a gray crop that the user framed around the LCD. Scale-normalised, no photo-specific values.
+  function readCrop(g0,w0,h0){
+    lastRow=null;
+    if(w0<120||h0<90)return '';
+    var W=300,H=Math.max(60,Math.round(h0*W/w0)),g=new Uint8Array(W*H),x,y;
+    for(y=0;y<H;y++){var sy=Math.min(h0-1,Math.floor((y+.5)*h0/H));for(x=0;x<W;x++)g[y*W+x]=g0[sy*w0+Math.min(w0-1,Math.floor((x+.5)*w0/W))];}
+    // Step 1: find the light LCD plate (largest bright blob), step 2: threshold only inside it.
+    var t1=otsu(g),mask=new Uint8Array(W*H),k;
+    for(k=0;k<g.length;k++)mask[k]=g[k]>t1?1:0;
+    var plates=components(mask,W,H).sort(function(a,b){return b.pts.length-a.pts.length;});
+    if(!plates.length||plates[0].w<W*.25||plates[0].h<H*.25)return '';
+    var P=plates[0],ix=Math.round(P.x+P.w*.03),iy=Math.round(P.y+P.h*.03),iw=Math.round(P.w*.94),ih=Math.round(P.h*.94);
+    var cg=new Uint8Array(iw*ih);
+    for(y=0;y<ih;y++)for(x=0;x<iw;x++)cg[y*iw+x]=g[(iy+y)*W+ix+x];
+    var votes={},rows={},total=0,W0=W,H0=H;W=iw;H=ih;
+    for(var ti=0;ti<4;ti++){
+      var thr=otsu(cg)+[0,-8,8,16][ti],ink=new Uint8Array(W*H);
+      for(var i=0;i<cg.length;i++)ink[i]=cg[i]<=thr?1:0;
+      removeBorderInk(ink,W,H);
+      // Keep only stroke-sized pieces (drops MEM, mg/dL, time digits), then take the tallest band of rows with ink.
+      var minpts=Math.max(60,.0045*W*H),keep=new Uint8Array(W*H),nkeep=0;
+      components(ink,W,H).forEach(function(c){if((c.pts.length>=minpts||(c.h>=H*.2&&c.pts.length>=40))&&c.h<H*.85&&c.w<W*.6){c.pts.forEach(function(j){keep[j]=1;});nkeep++;}});
+      if(!nkeep)continue;
+      var rs=new Int32Array(H);
+      for(y=0;y<H;y++)for(x=0;x<W;x++)if(keep[y*W+x])rs[y]++;
+      var bands=mergeRuns(runsFrom(rs,0),Math.max(6,Math.round(H*.04))).sort(function(p,q){return (q[1]-q[0])-(p[1]-p[0]);});
+      if(!bands.length||bands[0][1]-bands[0][0]<H*.22)continue;
+      var y0=bands[0][0],y1=bands[0][1],x0=0,x1=W,pad=10,sw=W+pad*2,sh=y1-y0+pad*2,sub=new Uint8Array(sw*sh);
+      for(y=y0;y<y1;y++)for(x=0;x<W;x++)if(keep[y*W+x])sub[(y-y0+pad)*sw+x+pad]=1;
+      // Guard: stroke-sized ink beside the digit row that we threw away could be a lost digit. Then do not vote.
+      var kx0=W,kx1=0,bh0=y1-y0;
+      for(y=y0;y<y1;y++)for(x=0;x<W;x++)if(keep[y*W+x]){if(x<kx0)kx0=x;if(x>kx1)kx1=x;}
+      var lost=false;
+      components(ink,W,H).forEach(function(c){
+        if(keep[c.pts[0]])return;
+        var cyc=c.y+c.h/2;
+        if(c.pts.length>=30&&c.h>=bh0*.14&&cyc>y0&&cyc<y1&&(c.x+c.w<kx0||c.x>kx1)&&c.x+c.w>kx0-bh0*.9&&c.x<kx1+bh0*.9)lost=true;
+      });
+      if(lost)continue;
+      for(var ai=0;ai<5;ai++)for(var si=0;si<3;si++){
+        var a=[-6,-3,0,3,6][ai]*Math.PI/180,shear=[-.16,-.08,0][si],dst=new Uint8Array(sw*sh),co=Math.cos(a),sn=Math.sin(a);
+        for(y=0;y<sh;y++)for(x=0;x<sw;x++){var dx=x-sw/2,dy=y-sh/2,sx=Math.round(co*dx+sn*dy+shear*dy+sw/2),sy2=Math.round(-sn*dx+co*dy+sh/2);if(sx>=0&&sx<sw&&sy2>=0&&sy2<sh)dst[y*sw+x]=sub[sy2*sw+sx];}
+        var r=meterRow(dst,sw,sh);
+        if(r){var v=votes[r.out]||(votes[r.out]={count:0,t:{}});v.count++;v.t[ti]=true;rows[r.out]={ink:dst,w:sw,h:sh};total++;}
+      }
+    }
+    var keys=Object.keys(votes).sort(function(a,b){return votes[b].count-votes[a].count;});
+    if(!keys.length)return '';
+    var v0=votes[keys[0]];
+    if(v0.count<4||v0.count/total<.95||Object.keys(v0.t).length<2)return '';
+    lastRow=rows[keys[0]];return keys[0];
+  }
+ return {readCrop:readCrop,read:readMeter,getRow:function(){return lastRow;}};
 });
