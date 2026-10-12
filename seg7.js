@@ -246,50 +246,63 @@
     for(y=0;y<h;y++)for(x=0;x<w;x++){var x0=Math.max(0,x-r),x1=Math.min(w,x+r+1),y0=Math.max(0,y-r),y1=Math.min(h,y+r+1);var avg=(sum[y1*stride+x1]-sum[y0*stride+x1]-sum[y1*stride+x0]+sum[y0*stride+x0])/((x1-x0)*(y1-y0));ink[y*w+x]=avg-g[y*w+x]>threshold?1:0;}
     return ink;
   }
-  function adaptiveRows(g,w,h,r,threshold){
-    var ink=localInk(g,w,h,r,threshold),cs=components(ink,w,h),clean=new Uint8Array(g.length),scale=Math.max(w,h)/374;
-    // Reject the bezel, hand, text baseline and tiny memory/time segments.
-    cs.forEach(function(c){if(c.w>=2*scale&&c.w<=30*scale&&c.h>=10*scale&&c.h<=60*scale&&c.pts.length>=12*scale*scale&&c.pts.length/(c.w*c.h)>.18)c.pts.forEach(function(i){clean[i]=1;});});
-    var expanded=new Uint8Array(clean.length),gap=Math.max(2,Math.round(4*scale));
-    for(var i=0;i<clean.length;i++)if(clean[i]){var x=i%w,y=(i/w)|0;for(var yy=Math.max(0,y-gap);yy<=Math.min(h-1,y+gap);yy++)for(var xx=Math.max(0,x-gap);xx<=Math.min(w-1,x+gap);xx++)expanded[yy*w+xx]=1;}
-    var groups=components(expanded,w,h),results=[];
-    groups.forEach(function(c){if(c.w<35*scale||c.w>120*scale||c.h<25*scale||c.h>70*scale)return;var pad=Math.round(5*scale),sw=c.w+pad*2,sh=c.h+pad*2,sub=new Uint8Array(sw*sh);for(var yy=0;yy<c.h;yy++)for(var xx=0;xx<c.w;xx++)sub[(yy+pad)*sw+xx+pad]=clean[(yy+c.y)*w+xx+c.x];var d=detect(sub,sw,sh);if(/^[0-9]{2,3}$/.test(d.out)&&d.valid===d.out.length&&d.maxScore<=1.15&&d.minMargin>=.6)results.push({out:d.out,height:c.h,score:d.maxScore,ink:sub,w:sw,h:sh});});
-    results.sort(function(a,b){return b.height-a.height;});
-    if(!results.length)return null;
-    // Competing similarly sized readings are not a reason to guess.
-    for(i=1;i<results.length;i++)if(results[i].height>=results[0].height*.7&&results[i].out!==results[0].out)return null;
-    return results[0];
-  }
   var lastRow=null;
-  function readAdaptive(grab,fw,fh){lastRow=null;
-    var votes={},bestRows={},angs=[-4,0,4],radii=[6,10,14,20],thresholds=[5,9,13],scale=Math.max(fw,fh)/374;
-    for(var ai=0;ai<angs.length;ai++) {var source=grab(fw,fh,angs[ai]), factor=Math.min(1,374/Math.max(fw,fh)),w=Math.round(fw*factor),h=Math.round(fh*factor),g=new Uint8Array(w*h);for(var yy=0;yy<h;yy++)for(var xx=0;xx<w;xx++)g[yy*w+xx]=source[Math.min(fh-1,Math.round(yy/factor))*fw+Math.min(fw-1,Math.round(xx/factor))];scale=Math.max(w,h)/374;for(var ri=0;ri<radii.length;ri++)for(var ti=0;ti<thresholds.length;ti++){var r=adaptiveRows(g,w,h,Math.max(3,Math.round(radii[ri]*scale)),thresholds[ti]);if(r){var v=votes[r.out]||(votes[r.out]={count:0,angles:{},thresholds:{}});v.count++;v.angles[ai]=true;v.thresholds[ti]=true;if(!bestRows[r.out]||r.score<bestRows[r.out].score)bestRows[r.out]=r;}}}
-    var keys=Object.keys(votes).sort(function(a,b){return votes[b].count-votes[a].count;});if(!keys.length)return "";var v=votes[keys[0]],total=0;keys.forEach(function(k){total+=votes[k].count;});if(v.count/total<.85)return "";for(var ki=1;ki<keys.length;ki++)if(votes[keys[ki]].count>=2)return "";if(v.count>=4&&Object.keys(v.angles).length>=2&&Object.keys(v.thresholds).length>=2){lastRow=bestRows[keys[0]];return keys[0];}return "";
-  }
-
-  /* Conservative consensus: a valid glucose value is not proof of a valid read.
-     Never return partial digits or a single lucky crop. Uncertain photos stay blank. */
-  function readLegacy(grab, fw, fh) {
-    var votes = {}, rows = {}, candidates = [], fracs = [1, .75, .55, .4], angs = [-12,-8.5,-8.1,-8,-7.9,-7.5,-4.5,-4.1,-4,-3.9,-3.5,-.5,-.1,0,.1,.5,3.5,3.9,4,4.1,4.5,7.5,7.9,8,8.1,8.5,12];
-    for (var fi = 0; fi < fracs.length; fi++) {
-      var cw = Math.max(1, (fw * fracs[fi]) | 0), ch = Math.max(1, (fh * fracs[fi]) | 0);
-      for (var ai = 0; ai < angs.length; ai++) {
-        var pixels = grab(cw, ch, angs[ai]), bright = 0;
-        for (var gi = 0; gi < pixels.length; gi++) if (pixels[gi] >= 250) bright++;
-        // Clipped highlights can erase a leading digit. Do not infer through glare.
-        if (bright / pixels.length > .005) continue;
-        var r = runDetect(pixels, cw, ch);
-        if (!/^[0-9]{2,3}$/.test(r.out) || r.negq !== 0 || r.valid !== r.out.length || r.maxScore > .95 || r.minMargin < .45 || r.height < .16) continue;
-        candidates.push(r.out);rows[r.out]=r.row;
-        var v = votes[r.out] || (votes[r.out] = { count: 0, crops: {} });
-        v.count++; v.crops[fi] = true;
+  // Local illumination, component-size row localisation, then deskew/shear.
+  // No recognised value or photo coordinates are built into this reader.
+  function readMeter(grab,fw,fh){
+    lastRow=null;
+    var src=grab(fw,fh,0),f=Math.min(1,700/Math.max(fw,fh)),w=Math.round(fw*f),h=Math.round(fh*f),g=new Uint8Array(w*h);
+    for(var y=0;y<h;y++)for(var x=0;x<w;x++)g[y*w+x]=src[Math.min(fh-1,Math.round(y/f))*fw+Math.min(fw-1,Math.round(x/f))];
+    var scale=Math.max(w,h)/700;var votes={},rows={},attempts=[];
+    for(var ri=0;ri<3;ri++)for(var ti=0;ti<3;ti++){
+      var ink=localInk(g,w,h,Math.max(4,Math.round([14,22,30][ri]*scale)),[6,10,14][ti]),cs=components(ink,w,h),clean=new Uint8Array(w*h);
+      var eligible=cs.filter(function(c){return c.w>=2*scale&&c.w<=w*.12&&c.h>=15*scale&&c.h<=h*.13&&c.pts.length>=65*scale*scale&&c.pts.length/(c.w*c.h)>.18;});
+      var groups=[];
+      eligible.forEach(function(seed){var cy=seed.y+seed.h/2;var row=eligible.filter(function(c){return Math.abs(c.y+c.h/2-cy)<Math.max(c.h,seed.h)*.8&&Math.abs(c.x-seed.x)<seed.h*5;});var x0=w,x1=0,y0=h,y1=0;row.forEach(function(c){x0=Math.min(x0,c.x);x1=Math.max(x1,c.x+c.w);y0=Math.min(y0,c.y);y1=Math.max(y1,c.y+c.h);});if(x1-x0>25*scale&&x1-x0<w*.5&&y1-y0>=25*scale&&y1-y0<h*.13)groups.push({x:x0,y:y0,w:x1-x0,h:y1-y0});});
+      groups=groups.filter(function(a){return !groups.some(function(b){return b!==a&&b.w>a.w*1.15&&a.x>=b.x-3&&a.x+a.w<=b.x+b.w+3&&Math.abs(a.y+a.h/2-b.y-b.h/2)<b.h*.3;});});groups.sort(function(a,b){return b.h-a.h;});
+      groups=groups.filter(function(c,i){return !i||!groups.slice(0,i).some(function(b){return Math.abs(b.x-c.x)<5&&Math.abs(b.y-c.y)<5;});});
+      for(var gi=0;gi<groups.length;gi++){
+        var c=groups[gi];if(gi>15)break;
+        var pad=10,sw=c.w+pad*2,sh=c.h+pad*2,sub=new Uint8Array(sw*sh);
+        // Otsu is applied only to the located large digit row, not the room/bezel.
+        var crop=new Uint8Array(c.w*c.h);
+        for(var yy=0;yy<c.h;yy++)for(var xx=0;xx<c.w;xx++)crop[yy*c.w+xx]=g[(c.y+yy)*w+c.x+xx];
+        var thr=otsu(crop)+[0,-4,4][ti];
+        for(yy=0;yy<c.h;yy++)for(xx=0;xx<c.w;xx++)sub[(yy+pad)*sw+xx+pad]=crop[yy*c.w+xx]<=thr?1:0;
+        for(var ai=0;ai<5;ai++)for(var si=0;si<3;si++){
+          var a=[-6,-3,0,3,6][ai]*Math.PI/180,shear=[-.16,-.08,0][si],dst=new Uint8Array(sw*sh),co=Math.cos(a),sn=Math.sin(a);
+          for(yy=0;yy<sh;yy++)for(xx=0;xx<sw;xx++){var dx=xx-sw/2,dy=yy-sh/2,sx=Math.round(co*dx+sn*dy+shear*dy+sw/2),sy=Math.round(-sn*dx+co*dy+sh/2);if(sx>=0&&sx<sw&&sy>=0&&sy<sh)dst[yy*sw+xx]=sub[sy*sw+sx];}
+          var r=meterRow(dst,sw,sh);
+          if(r){var v=votes[r.out]||(votes[r.out]={count:0,thresholds:{},radii:{}});v.count++;v.thresholds[ti]=true;v.radii[ri]=true;rows[r.out]={ink:dst,w:sw,h:sh};}
+        }
       }
     }
-    var keys = Object.keys(votes);
-    if (keys.length !== 1) return "";
-    var v = votes[keys[0]];
-    if(v.count >= 4 && Object.keys(v.crops).length >= 2){lastRow=rows[keys[0]];return keys[0];}return "";
+    var keys=Object.keys(votes).sort(function(a,b){return votes[b].count-votes[a].count;});
+
+    if(!keys.length)return '';
+    var v=votes[keys[0]],total=0;keys.forEach(function(k){total+=votes[k].count;});
+    if(v.count<5||v.count/total<.98||Object.keys(v.thresholds).length<2||Object.keys(v.radii).length<2)return '';
+    lastRow=rows[keys[0]];return keys[0];
   }
-  function read(grab,fw,fh){var a=readAdaptive(grab,fw,fh);if(a)return a;var f=Math.min(1,480/Math.max(fw,fh)),w=Math.round(fw*f),h=Math.round(fh*f);function small(cw,ch,ang){var sw=Math.max(1,Math.round(cw/f)),sh=Math.max(1,Math.round(ch/f)),src=grab(sw,sh,ang),out=new Uint8Array(cw*ch);for(var y=0;y<ch;y++)for(var x=0;x<cw;x++)out[y*cw+x]=src[Math.min(sh-1,Math.round(y/f))*sw+Math.min(sw-1,Math.round(x/f))];return out;}return readLegacy(small,w,h);}
-  return { read: read, readAdaptive: readAdaptive, getRow: function(){return lastRow;}, runDetect: runDetect, detect: detect, otsu: otsu };
+  function meterRow(ink,w,h){
+    var ys=runsFrom(colsumBandTranspose(ink,w,h),1);ys=mergeRuns(ys,5);if(!ys.length)return null;ys.sort(function(a,b){return b[1]-b[0]-(a[1]-a[0]);});
+    var y0=ys[0][0],y1=ys[0][1],bh=y1-y0;
+    var cs=colsumBand(ink,w,y0,y1),runs=mergeRuns(runsFrom(cs,1),3);
+    runs=runs.filter(function(r){return r[1]-r[0]>=3;});
+    if(runs.length<2||runs.length>3)return null;
+    var out='';
+    for(var k=0;k<runs.length;k++){
+      var x0=runs[k][0],x1=runs[k][1],bw=x1-x0;var ey0=h,ey1=0;for(var yy=0;yy<h;yy++)for(var xx=x0;xx<x1;xx++)if(ink[yy*w+xx]){ey0=Math.min(ey0,yy);ey1=Math.max(ey1,yy+1);}if(ey1-ey0<12)return null;y0=ey0;y1=ey1;bh=y1-y0;
+      if(bw<bh*.24){if(bw<bh*.06)return null;out+='1';continue;}
+      if(bw/bh<.32||bw/bh>.62)return null;
+      function dens(fx0,fx1,fy0,fy1){var hit=0,n=0;for(var y=Math.floor(y0+bh*fy0);y<Math.ceil(y0+bh*fy1);y++)for(var x=Math.floor(x0+bw*fx0);x<Math.ceil(x0+bw*fx1);x++){hit+=ink[y*w+x]||0;n++;}return hit/n;}
+      var ds=[dens(.25,.75,0,.13),dens(.72,1,.15,.4),dens(.72,1,.6,.85),dens(.25,.75,.87,1),dens(0,.28,.6,.85),dens(0,.28,.15,.4),dens(.25,.75,.43,.57)],bits=ds.map(function(d){return d>.3?1:0;}),digit=null;
+      for(var d in PATS){if(PATS[d].every(function(b,i){return b===bits[i]&&(b?ds[i]>.35:ds[i]<.18);}))digit=d;}
+      if(digit===null)return null;out+=digit;
+    }
+    var n=+out;if(n<20||n>600||out[0]==='0')return null;return {out:out};
+  }
+  function colsumBandTranspose(ink,w,h){var ys=new Int32Array(h);for(var y=0;y<h;y++)for(var x=0;x<w;x++)ys[y]+=ink[y*w+x];return ys;}
+
+ return {read:readMeter,getRow:function(){return lastRow;}};
 });
