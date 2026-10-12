@@ -451,3 +451,70 @@ var preference='auto';try{preference=localStorage.getItem('diabo-theme-v2')||'au
     document.getElementById("sheet-voice").classList.add("hidden");
   });
 })();
+
+// Retention starts after deferred cloud-sync wrappers are ready.
+window.addEventListener('DOMContentLoaded', function () {
+/* Keep the last three India-calendar months. Cleanup uses normal sync deletions. */
+(function () {
+  'use strict';
+  var D = window.Diabo;
+  if (!D) return;
+  var running = false;
+  function indiaDay(time) {
+    var d = new Date(time + 330 * 60000);
+    return [d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate()];
+  }
+  function dayKey(parts) {
+    return parts[0] + '-' + String(parts[1]).padStart(2, '0') + '-' + String(parts[2]).padStart(2, '0');
+  }
+  function cutoff(now) {
+    var p = indiaDay(now), m = new Date(Date.UTC(p[0], p[1] - 4, 1));
+    var last = new Date(Date.UTC(m.getUTCFullYear(), m.getUTCMonth() + 1, 0)).getUTCDate();
+    return dayKey([m.getUTCFullYear(), m.getUTCMonth() + 1, Math.min(p[2], last)]);
+  }
+  function expired(r, boundary) {
+    if (!r || !Number.isSafeInteger(r.ts) || r.ts <= 0) return false;
+    var date = D.readingDate(r);
+    if (date) {
+      var p = date.split('-').map(Number), d = new Date(Date.UTC(p[0], p[1] - 1, p[2]));
+      if (d.getUTCFullYear() !== p[0] || d.getUTCMonth() + 1 !== p[1] || d.getUTCDate() !== p[2]) return false;
+    } else date = dayKey(indiaDay(r.ts));
+    return date < boundary;
+  }
+  function prune() {
+    if (running) return;
+    running = true;
+    try {
+      var boundary = cutoff(Date.now());
+      D.load().forEach(function (r) { if (expired(r, boundary)) D.remove(r.id); });
+      // This local migration backup must not retain expired glucose values.
+      var key = 'diabo-before-sync-v1', raw = localStorage.getItem(key);
+      if (raw !== null) {
+        var list = JSON.parse(raw);
+        if (Array.isArray(list)) {
+          var keep = list.filter(function (r) { return !expired(r, boundary); });
+          if (keep.length !== list.length) localStorage.setItem(key, JSON.stringify(keep));
+        }
+      }
+    } catch (e) { console.warn('Diabo retention paused; retry on next open or sync.'); }
+    finally { running = false; }
+  }
+  // Keep the existing sync wrappers. Their deletion markers prevent resurrection.
+  ['save', 'restore', 'replaceReadings'].forEach(function (name) {
+    var original = D[name];
+    D[name] = function () {
+      var result = original.apply(D, arguments);
+      if (result !== false) prune();
+      return result;
+    };
+  });
+  window.addEventListener('diabo-authorized', prune);
+  window.addEventListener('online', prune);
+  window.addEventListener('pageshow', prune);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) prune(); });
+  // Local-only clock checks; no network polling. An open app also ages out readings.
+  setInterval(prune, 60000);
+  prune();
+})();
+
+});
