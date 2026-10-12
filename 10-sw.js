@@ -1,4 +1,4 @@
-const CACHE='diabo-offline-v45';
+const CACHE='diabo-offline-v46';
 const FILES=['./','./index.html','./8-theme-v2.css?v=27','./seg7.js?v=5','./7-diabo-v2.js?v=23','./11-insights.js?v=12','./1-9-sync.js?v=8','./manifest.webmanifest?v=2','./icons/1-1-apple-touch-icon.png','./icons/2-2-icon-192.png','./icons/3-3-icon-512.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)));self.skipWaiting();});
 self.addEventListener('activate',e=>e.waitUntil(Promise.all([self.clients.claim(),caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('diabo-offline-')&&k!==CACHE).map(k=>caches.delete(k))))])));
