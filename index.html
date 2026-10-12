@@ -29,7 +29,7 @@ body.app-locked{background:#000!important}body.app-locked>header,body.app-locked
 <section id="app-gate" aria-label="Sign in"><div id="gate-stack" class="gate-stack"><button id="gate-open" aria-label="Sign in" class="lock-trigger"><svg viewBox="0 0 120 120" width="108" height="108" fill="none" aria-hidden="true"><rect x="25" y="51" width="70" height="57" rx="18" stroke="#eeeeee" stroke-width="3" fill="#202020"/><path class="lock-shackle" d="M40 51V33a20 20 0 0 1 40 0v18" stroke="#eeeeee" stroke-width="3" stroke-linecap="round"/><circle cx="60" cy="76" r="5" fill="#cccccc"/><path d="M60 80v10" stroke="#cccccc" stroke-width="3" stroke-linecap="round"/></svg></button><div class="gate-caption">Welcome back</div><div class="lock-label">Tap to unlock</div></div><form id="gate-form" class="hidden"><label>Email<input id="gate-email" type="email" autocomplete="username" required></label><label>Password<input id="gate-password" type="password" autocomplete="current-password" required></label><button type="submit">Sign in</button><p id="gate-status" role="status"></p></form></section>
 <header>
   <div class="brand">
-    <svg class="drop" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="#ff4757" stroke-width="1.7" stroke-linecap="round"><path d="M12 2.6C12 2.6 5.6 10.6 5.6 15.2C5.6 19 8.5 21.4 12 21.4C15.5 21.4 18.4 19 18.4 15.2C18.4 10.6 12 2.6 12 2.6Z"/><circle cx="9.7" cy="14.3" r="0.9" fill="#ff4757" stroke="none"/><circle cx="14.3" cy="14.3" r="0.9" fill="#ff4757" stroke="none"/><path d="M9.3 16.6C10.1 17.5 11 18 12 18C13 18 13.9 17.5 14.7 16.6"/></svg>
+    <svg class="drop" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C12 2 5 10.5 5 15.2C5 19.2 8.1 22 12 22C15.9 22 19 19.2 19 15.2C19 10.5 12 2 12 2Z" fill="#ff4757"/></svg>
     <h1>Diabo</h1>
   </div>
   <button id="theme-toggle" class="icon-button" aria-label="Change colour theme" type="button">◐</button>
@@ -109,8 +109,8 @@ body.app-locked{background:#000!important}body.app-locked>header,body.app-locked
 
 <footer>Tracker only - not medical advice. Local readings stay on this device; private sync is optional.</footer>
 
-<script src="seg7.js?v=12" defer></script>
-<script src="7-diabo-v2.js?v=27" defer></script>
+<script src="seg7.js?v=13" defer></script>
+<script src="7-diabo-v2.js?v=28" defer></script>
 <script>
 document.addEventListener('DOMContentLoaded',function(){
 var choice=document.getElementById('reading-method');
