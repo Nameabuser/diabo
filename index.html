@@ -135,6 +135,9 @@ var last=window.Diabo.load()[0];
 if(last&&String(last.value)===String(+val)&&last.tag===tag&&Date.now()-last.ts<30000){say('Already saved '+(+val)+' just now');return;}
 if(window.Diabo.save(+val,tag)===false)return;
 // Successful Siri adds render immediately through Diabo.save; no popup.
+  
+var tt=document.getElementById('toast');if(tt)tt.classList.add('hidden');
+
 });
 })();
 </script>
