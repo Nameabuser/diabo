@@ -238,10 +238,14 @@
     }
     return out;
   }
-  function localInk(g,w,h,r,threshold){
-    // Integral box mean removes uneven LCD illumination without inventing segments.
+  function integralGray(g,w,h){
     var stride=w+1,sum=new Float64Array(stride*(h+1));
     for(var y=0;y<h;y++){var row=0;for(var x=0;x<w;x++){row+=g[y*w+x];sum[(y+1)*stride+x+1]=sum[y*stride+x+1]+row;}}
+    return sum;
+  }
+  function localInk(g,w,h,r,threshold,integral){
+    // Integral box mean removes uneven LCD illumination without inventing segments.
+    var stride=w+1,sum=integral||integralGray(g,w,h),y,x;
     var ink=new Uint8Array(g.length);
     for(y=0;y<h;y++)for(x=0;x<w;x++){var x0=Math.max(0,x-r),x1=Math.min(w,x+r+1),y0=Math.max(0,y-r),y1=Math.min(h,y+r+1);var avg=(sum[y1*stride+x1]-sum[y0*stride+x1]-sum[y1*stride+x0]+sum[y0*stride+x0])/((x1-x0)*(y1-y0));ink[y*w+x]=avg-g[y*w+x]>threshold?1:0;}
     return ink;
@@ -321,7 +325,13 @@
   // ---- Live-camera row reader (v11): segment clustering, no photo-specific values. ----
   // Digits are found as clusters of stroke-sized dark pieces, so thin or blurred digits whose segments
   // do not touch still form one digit row, at any distance. Anything unclear returns blank.
-  function percentile(arr,p){var a=Array.prototype.slice.call(arr).sort(function(x,y){return x-y;});return a[Math.min(a.length-1,Math.max(0,Math.floor(a.length*p)))];}
+  function percentile(arr,p){
+    // All samples are 8-bit grayscale. Histogram selection returns the exact sorted percentile.
+    if(!arr.length)return undefined;
+    var hist=new Uint32Array(256),i,target=Math.min(arr.length-1,Math.max(0,Math.floor(arr.length*p))),n=0;
+    for(i=0;i<arr.length;i++)hist[arr[i]]++;
+    for(i=0;i<256;i++){n+=hist[i];if(n>target)return i;}
+  }
   function clusterRows(cs,w,h){
     var seg=cs.filter(function(c){var L=Math.max(c.w,c.h),S=Math.min(c.w,c.h);return L>=.06*h&&L<=.5*h&&S>=2&&c.pts.length>=.12*L*S&&c.w<=.3*w&&c.x>0&&c.y>0&&c.x+c.w<w&&c.y+c.h<h;});
     var par=seg.map(function(_,i){return i;});
@@ -374,10 +384,10 @@
   }
   function readLive(g,w,h){
     lastRow=null;
-    var votes={},rows={},total=0,rowLen={};
+    var votes={},rows={},total=0,rowLen={},integral=integralGray(g,w,h);
     var early=false;
     for(var ri=0;ri<4&&!early;ri++)for(var ti=0;ti<3&&!early;ti++){
-      var rad=Math.max(5,Math.round([.02,.035,.05,.07][ri]*w)),ink=localInk(g,w,h,rad,[6,10,14][ti]),cs=components(ink,w,h);
+      var rad=Math.max(5,Math.round([.02,.035,.05,.07][ri]*w)),ink=localInk(g,w,h,rad,[6,10,14][ti],integral),cs=components(ink,w,h);
       var cl=clusterRows(cs,w,h).slice(0,2);
       if(!cl.length)continue;
       // The tallest digit-like cluster is the reading. A second, equally tall cluster means we cannot tell which one is it.
@@ -412,11 +422,12 @@
       for(yy=0;yy<c.h;yy++)for(xx=0;xx<c.w;xx++)crop[yy*c.w+xx]=g[(c.y+yy)*w+c.x+xx];
       var thr=otsu(crop)+[0,-4,4][ti],ink2=new Uint8Array(sw*sh);
       for(yy=0;yy<c.h;yy++)for(xx=0;xx<c.w;xx++)ink2[(yy+pad)*sw+xx+pad]=(crop[yy*c.w+xx]<=thr&&sub[(yy+pad)*sw+xx+pad])?1:0;
+      var blankSlot=undefined;
       for(var ai=0;ai<7;ai++)for(var si=0;si<11;si++){
         var a=[-9,-6,-3,0,3,6,9][ai]*Math.PI/180,shear=[-.32,-.28,-.24,-.2,-.16,-.12,-.08,-.04,0,.04,.08][si],dst=new Uint8Array(sw*sh),co=Math.cos(a),sn=Math.sin(a);
         for(yy=0;yy<sh;yy++)for(xx=0;xx<sw;xx++){var dx=xx-sw/2,dy=yy-sh/2,sx=Math.round(co*dx+sn*dy+shear*dy+sw/2),sy=Math.round(-sn*dx+co*dy+sh/2);if(sx>=0&&sx<sw&&sy>=0&&sy<sh)dst[yy*sw+xx]=ink2[sy*sw+sx];}
         var r=meterRow(dst,sw,sh,true);
-        if(r&&(r.out.length===2)&&!slotBlank(g,w,h,c))r=null;
+        if(r&&r.out.length===2){if(blankSlot===undefined)blankSlot=slotBlank(g,w,h,c);if(!blankSlot)r=null;}
         if(r){var v=votes[r.out]||(votes[r.out]={count:0,cellset:{},cells:0});v.count++;if(!v.cellset[ri+'_'+ti]){v.cellset[ri+'_'+ti]=1;v.cells++;}rows[r.out]={ink:dst,w:sw,h:sh};}
         total++;
       }
@@ -444,8 +455,9 @@
     var cg=new Uint8Array(iw*ih);
     for(y=0;y<ih;y++)for(x=0;x<iw;x++)cg[y*iw+x]=g[(iy+y)*W+ix+x];
     var votes={},rows={},total=0,W0=W,H0=H;W=iw;H=ih;
+    var cropThreshold=otsu(cg);
     for(var ti=0;ti<4;ti++){
-      var thr=otsu(cg)+[0,-8,8,16][ti],ink=new Uint8Array(W*H);
+      var thr=cropThreshold+[0,-8,8,16][ti],ink=new Uint8Array(W*H);
       for(var i=0;i<cg.length;i++)ink[i]=cg[i]<=thr?1:0;
       removeBorderInk(ink,W,H);
       // Keep only stroke-sized pieces (drops MEM, mg/dL, time digits), then take the tallest band of rows with ink.
