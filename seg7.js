@@ -263,6 +263,17 @@
       groups=groups.filter(function(c,i){return !i||!groups.slice(0,i).some(function(b){return Math.abs(b.x-c.x)<5&&Math.abs(b.y-c.y)<5;});});
       for(var gi=0;gi<groups.length;gi++){
         var c=groups[gi];if(gi>15)break;
+        // Guard: ink beside the row that spans most of the digit height may be a lost digit (e.g. a leading 1 split into fragments). Stay blank.
+        var lostDigit=false;
+        [[c.x-Math.round(c.h*1.4),c.x+1],[c.x+c.w-1,c.x+c.w+Math.round(c.h*1.4)]].forEach(function(sd){
+          var n=0,ymin=h,ymax=0;
+          cs.forEach(function(k){
+            if(k.x<sd[0]||k.x+k.w>sd[1]||k.y<c.y-c.h*.4||k.y+k.h>c.y+c.h*1.4||k.h>c.h*1.3||k.w>c.h)return;
+            n+=k.pts.length;if(k.y<ymin)ymin=k.y;if(k.y+k.h>ymax)ymax=k.y+k.h;
+          });
+          if(n>=18*scale*scale&&ymax-ymin>=c.h*.45)lostDigit=true;
+        });
+        if(lostDigit)continue;
         var pad=10,sw=c.w+pad*2,sh=c.h+pad*2,sub=new Uint8Array(sw*sh);
         // Otsu is applied only to the located large digit row, not the room/bezel.
         var crop=new Uint8Array(c.w*c.h);
