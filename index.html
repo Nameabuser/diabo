@@ -133,7 +133,7 @@ history.replaceState(null,'',location.pathname);
 if(!window.Diabo.valid(val)){say('Could not read a reading from "'+text.slice(0,30)+'". Nothing saved.');return;}
 var last=window.Diabo.load()[0];
 if(last&&String(last.value)===String(+val)&&last.tag===tag&&Date.now()-last.ts<30000){say('Already saved '+(+val)+' just now');return;}
-Diabo.resetReadingDate();if(Diabo.saveReading(+val,tag)===false)return;
+if(tag)Diabo.load().forEach(function(r){if(r.tag===tag&&new Date(r.ts).toDateString()===new Date().toDateString())Diabo.remove(r.id);});Diabo.resetReadingDate();if(Diabo.saveReading(+val,tag)===false)return;
 // Successful Siri adds render immediately through Diabo.save; no popup.
   
 var tt=document.getElementById('toast');if(tt)tt.classList.add('hidden');
