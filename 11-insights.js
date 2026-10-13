@@ -112,8 +112,8 @@ function pdf(rows,now){
     y+=6;
     text(ML,y,'YOUR READINGS','F2',8,FAINT);
     y+=14;
-    var COLS={date:ML,time:150,val:240,tag:330,status:445};
-    var headerRow=function(){rect(ML,y-11,MRX-ML,17,[0,0,0]);text(COLS.date,y,'DATE','F2',7.2,WHITE);text(COLS.time,y,'TIME','F2',7.2,WHITE);text(COLS.val,y,'MG/DL','F2',7.2,WHITE);text(COLS.tag,y,'TIME OF DAY','F2',7.2,WHITE);text(COLS.status,y,'STATUS','F2',7.2,WHITE);y+=12;};
+    var COLS={date:ML,val:200,tag:300,status:420};
+    var headerRow=function(){rect(ML,y-11,MRX-ML,17,[0,0,0]);text(COLS.date,y,'DATE','F2',7.2,WHITE);text(COLS.val,y,'MG/DL','F2',7.2,WHITE);text(COLS.tag,y,'TIME OF DAY','F2',7.2,WHITE);text(COLS.status,y,'STATUS','F2',7.2,WHITE);y+=12;};
     headerRow();
     var SN=['Below target','In range','Above target'],SC=[ORANGE,GREEN,RED];
     list.forEach(function(r,idx){
@@ -121,7 +121,6 @@ function pdf(rows,now){
       if(idx%2===0)rect(ML,y-10.5,MRX-ML,16.5,ZEBRA);
       var d=new Date(r.ts),only=dateOnly(r);
       text(COLS.date,y,dShort(d),'F1',9,INK);
-      text(COLS.time,y,only?'-':t12(d),'F1',9,INK);
       text(COLS.val,y,String(r.value),'F2',9.5,INK);
       text(COLS.tag,y,label(r.tag)||'-','F1',9,INK);
       var st=statusOf(r);
