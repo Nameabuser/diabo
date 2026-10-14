@@ -3,18 +3,19 @@
   "use strict";
   var KEY = "diabo-readings-v1";
   var lastCreated=0;
-  var TAGS = ["fasting", "before meal", "after meal"];
+  var TAGS = ["fasting", "before meal", "after meal", "midnight"];
   function baseTag(tag){return String(tag||"").split("|date=")[0];}
   function readingDate(r){var m=/\|date=(\d{4}-\d{2}-\d{2})$/.exec(String(r.tag||""));return m?m[1]:"";}
   function readingOrder(a,b){var ad=readingDate(a),bd=readingDate(b),at=ad?new Date(ad+'T00:00:00').getTime():a.ts,bt=bd?new Date(bd+'T00:00:00').getTime():b.ts;return bt-at||Number(String(b.id).split('-')[0])-Number(String(a.id).split('-')[0])||String(b.id).localeCompare(String(a.id));}
   function tagLabel(tag) {
     tag=baseTag(tag);
     return { fasting: "Morning", "before meal": "Afternoon", "after meal": "Evening",
-      morning: "Morning", afternoon: "Afternoon", evening: "Evening" }[tag] || tag;
+      morning: "Morning", afternoon: "Afternoon", evening: "Evening", midnight: "Midnight" }[tag] || tag;
   }
   function parseTag(text) {
     var t = String(text).toLowerCase();
-    return /\b(morning|fasting)\b/.test(t) ? "fasting"
+    return /\bmidnight\b/.test(t) ? "midnight"
+      : /\b(morning|fasting)\b/.test(t) ? "fasting"
       : /\b(evening|after)\b/.test(t) ? "after meal"
       : /\b(afternoon|before)\b/.test(t) ? "before meal" : "";
   }
@@ -86,7 +87,7 @@
   }
 
   var sharedTag = "", tagControls = [];
-  function pickTag(t) {sharedTag=t;tagControls.forEach(function(c){c.update(t);});}
+  function pickTag(t) {sharedTag=t;tagControls.forEach(function(c){c.update(t);});syncDateFields();}
   function fillTags(container, onPick) {
     container.innerHTML = "";
     var cur = "";
@@ -101,6 +102,7 @@
       });
       container.appendChild(b);
     });
+    var note=document.createElement("p");note.className="hint hidden";note.setAttribute("data-midnight-note","");container.insertAdjacentElement("afterend",note);
     var ctl={update:function(t){cur=TAGS.indexOf(t)>=0?t:"";Array.prototype.forEach.call(container.children,function(c){c.classList.toggle("on",c.getAttribute("data-tag")===cur);c.setAttribute("aria-pressed",String(c.getAttribute("data-tag")===cur));});onPick(cur);},set:pickTag};
     tagControls.push(ctl);ctl.update(sharedTag);return ctl;
   }
@@ -110,13 +112,16 @@
   /* The date draft is for manual entry only. Siri/API saves still default to now. */
   var readingDay='';
   function localDate(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
-  function syncDateFields(){var today=localDate(new Date());document.querySelectorAll('[data-reading-date]').forEach(function(e){e.value=readingDay;e.max=today;e.min='1970-01-02';});document.querySelectorAll('[data-reading-day]').forEach(function(e){e.setAttribute('aria-pressed',String(readingDay===today));});document.querySelectorAll('[data-date-error]').forEach(function(e){e.classList.add('hidden');});}
+  // Today uses the clock; an earlier picked date names the night to file under.
+  function effectiveDay(tag){var d=new Date(readingDay+'T00:00:00');if(baseTag(tag)==='midnight'&&readingDay===localDate(new Date())&&new Date().getHours()<4)d.setDate(d.getDate()-1);return localDate(d);}
+  function midnightNotes(){document.querySelectorAll('[data-midnight-note]').forEach(function(e){e.classList.toggle('hidden',sharedTag!=='midnight');e.textContent='Midnight counts toward '+new Date(effectiveDay('midnight')+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})+'. Logged as Midnight.';});}
+  function syncDateFields(){var today=localDate(new Date());document.querySelectorAll('[data-reading-date]').forEach(function(e){e.value=readingDay;e.max=today;e.min='1970-01-02';});document.querySelectorAll('[data-reading-day]').forEach(function(e){e.setAttribute('aria-pressed',String(readingDay===today));});document.querySelectorAll('[data-date-error]').forEach(function(e){e.classList.add('hidden');});midnightNotes();}
   window.Diabo.resetReadingDate=function(){readingDay=localDate(new Date());pickTag('');syncDateFields();};
   document.querySelectorAll('[data-reading-date]').forEach(function(e){e.addEventListener('change',function(){readingDay=e.value;syncDateFields();});});
   document.querySelectorAll('[data-reading-day]').forEach(function(e){e.addEventListener('click',function(){readingDay=localDate(new Date());syncDateFields();});});
-  window.Diabo.saveReading=function(value,tag){var d=new Date(readingDay+'T00:00:00'),ts=d.getTime();if(!readingDay||!Number.isSafeInteger(ts)||ts<=0||readingDay>localDate(new Date())||localDate(d)!==readingDay){document.querySelectorAll('.sheet:not(.hidden) [data-date-error]').forEach(function(e){e.textContent='Choose a valid date, not in the future.';e.classList.remove('hidden');e.scrollIntoView({block:'nearest'});});return false;}var old=baseTag(tag)?window.Diabo.load().filter(function(r){return readingDate(r)===readingDay&&baseTag(r.tag)===baseTag(tag);}):[];var result=window.Diabo.save(value,baseTag(tag)+'|date='+readingDay,ts,old.map(function(r){return r.id;}));if(result&&old.length)window.dispatchEvent(new CustomEvent('diabo-replaced',{detail:{old:old,next:window.Diabo.load().find(function(r){return readingDate(r)===readingDay&&baseTag(r.tag)===baseTag(tag);})}}));return result;};
+  window.Diabo.saveReading=function(value,tag){var d=new Date(readingDay+'T00:00:00'),ts=d.getTime();if(!readingDay||!Number.isSafeInteger(ts)||ts<=0||readingDay>localDate(new Date())||localDate(d)!==readingDay){document.querySelectorAll('.sheet:not(.hidden) [data-date-error]').forEach(function(e){e.textContent='Choose a valid date, not in the future.';e.classList.remove('hidden');e.scrollIntoView({block:'nearest'});});return false;}var day=effectiveDay(tag);ts=new Date(day+'T00:00:00').getTime();var old=baseTag(tag)&&baseTag(tag)!=='midnight'?window.Diabo.load().filter(function(r){return readingDate(r)===day&&baseTag(r.tag)===baseTag(tag);}):[];var result=window.Diabo.save(value,baseTag(tag)+'|date='+day,ts,old.map(function(r){return r.id;}));if(result&&old.length)window.dispatchEvent(new CustomEvent('diabo-replaced',{detail:{old:old,next:window.Diabo.load().find(function(r){return readingDate(r)===day&&baseTag(r.tag)===baseTag(tag);})}}));return result;};
   
-var _sr=window.Diabo.saveReading;window.Diabo.saveReading=function(value,tag){if(!baseTag(tag)){var he=document.querySelector('.sheet:not(.hidden) [data-date-error]');if(he){he.textContent='Pick Morning, Afternoon or Evening first.';he.classList.remove('hidden');setTimeout(function(){he.classList.add('hidden');},3000);return false;}}return _sr(value,tag);};
+var _sr=window.Diabo.saveReading;window.Diabo.saveReading=function(value,tag){if(!baseTag(tag)){var he=document.querySelector('.sheet:not(.hidden) [data-date-error]');if(he){he.textContent='Pick Morning, Afternoon, Evening or Midnight first.';he.classList.remove('hidden');setTimeout(function(){he.classList.add('hidden');},3000);return false;}}return _sr(value,tag);};
 
   fillTags(document.querySelector('#sheet-methods [data-tags]'),function(){});
   window.Diabo.resetReadingDate();
