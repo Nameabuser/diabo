@@ -49,3 +49,5 @@ html{overflow-y:auto;scroll-behavior:auto;scrollbar-width:none}body{overflow:vis
 #sheet-scan .cam-wrap{margin-top:4px}
 #sheet-scan #scan-pick{margin:6px 0 0;padding:10px 14px;min-height:44px}
 #sheet-scan .scan-status{margin:4px 0 0;padding:4px 0}
+.section-heading select{width:auto;min-width:0;min-height:36px;padding:4px 24px 4px 10px;border:1px solid var(--line);border-radius:12px;background-color:var(--bg);color:var(--ink);font:inherit;font-size:16px;touch-action:manipulation}
+.section-heading select:focus-visible{outline:3px solid var(--accent);outline-offset:4px}
