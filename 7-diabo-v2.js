@@ -455,7 +455,7 @@ var preference='auto';try{preference=localStorage.getItem('diabo-theme-v2')||'au
 
 // Retention starts after deferred cloud-sync wrappers are ready.
 window.addEventListener('DOMContentLoaded', function () {
-/* Keep the last three India-calendar months. Cleanup uses normal sync deletions. */
+/* Keep the last six India-calendar months. Cleanup uses normal sync deletions. */
 (function () {
   'use strict';
   var D = window.Diabo;
@@ -469,7 +469,7 @@ window.addEventListener('DOMContentLoaded', function () {
     return parts[0] + '-' + String(parts[1]).padStart(2, '0') + '-' + String(parts[2]).padStart(2, '0');
   }
   function cutoff(now) {
-    var p = indiaDay(now), m = new Date(Date.UTC(p[0], p[1] - 4, 1));
+    var p = indiaDay(now), m = new Date(Date.UTC(p[0], p[1] - 7, 1));
     var last = new Date(Date.UTC(m.getUTCFullYear(), m.getUTCMonth() + 1, 0)).getUTCDate();
     return dayKey([m.getUTCFullYear(), m.getUTCMonth() + 1, Math.min(p[2], last)]);
   }
