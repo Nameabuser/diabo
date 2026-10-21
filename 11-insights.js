@@ -17,7 +17,7 @@ function pdf(rows,now){
   var list=valid(rows);
   var zone='device local';
   try{zone=Intl.DateTimeFormat().resolvedOptions().timeZone||'device local';}catch(e){}
-  var ranges={morning:{low:80,high:130},other:{low:80,high:180}};
+  var ranges={morning:{low:90,high:115},other:{low:80,high:180}};
   try{
     if(root.Diabo&&root.Diabo.ranges){
       var rr=root.Diabo.ranges();
