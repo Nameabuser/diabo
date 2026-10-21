@@ -173,7 +173,7 @@ var _sr=window.Diabo.saveReading;window.Diabo.saveReading=function(value,tag){if
 var D=window.Diabo, el=function(id){return document.getElementById(id);}, toastTimer, deleted,replacement;
 function notify(text,undo){clearTimeout(toastTimer);el('toast-text').textContent=text;el('undo').classList.toggle('hidden',!undo);el('toast').classList.remove('hidden');toastTimer=setTimeout(function(){el('toast').classList.add('hidden');deleted=null;replacement=null;},5000);}
 function validRange(r){return r&&Number.isFinite(Number(r.low))&&Number.isFinite(Number(r.high))&&Number(r.low)>=20&&Number(r.high)<=600&&Number(r.low)<Number(r.high);}
-function ranges(){return {morning:{low:80,high:130},other:{low:80,high:180}};}
+function ranges(){return {morning:{low:90,high:115},other:{low:80,high:180}};}
 function rangeFor(reading){var all=ranges(),tag=D.baseTag(reading.tag),r=tag==='fasting'||tag==='morning'?all.morning:tag==='before meal'||tag==='after meal'||tag==='afternoon'||tag==='evening'||tag==='midnight'?all.other:null;return validRange(r)?r:null;}
 D.ranges=ranges;D.rangeFor=rangeFor;
 function tone(reading){var r=rangeFor(reading);return !r?'':reading.value<r.low?'below':reading.value>r.high?'above':'within';}
