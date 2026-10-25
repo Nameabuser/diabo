@@ -69,7 +69,7 @@ function pdf(rows,now){
     if(stats&&stats.count)text(ML,y,stats.percent[1]+'% of your readings were in range ('+stats.counts[1]+' of '+stats.count+').','F2',10.5,GREEN);
     else text(ML,y,'Tag readings as morning, afternoon or evening to see time in range.','F1',9.5,GREY);
     y+=15;
-    text(ML,y,'Readings from '+dFull(new Date(list[list.length-1].ts))+' to '+dFull(now)+' - '+plural(list.length,'reading')+' in total','F1',8.5,FAINT);y+=24;
+    text(ML,y,'Readings from '+dFull(new Date(p30.start))+' to '+dFull(now)+' - '+plural(p30.count,'reading')+' in total','F1',8.5,FAINT);y+=24;
     var cw=(MRX-ML-24)/3;
     [['LAST 7 DAYS',p7],['LAST 30 DAYS',p30],['LAST 90 DAYS',p90]].forEach(function(pair,i){
       var x=ML+i*(cw+12);
@@ -105,13 +105,14 @@ function pdf(rows,now){
       y=cy+ch+26;
     }else{y+=8;}
     y+=6;
-    text(ML,y,'YOUR READINGS','F2',8,FAINT);
+    text(ML,y,'YOUR READINGS (LAST 30 DAYS)','F2',8,FAINT);
     y+=14;
+    if(!p30.rows.length){text(ML,y,'No readings in the last 30 days.','F1',9.5,GREY);}else{
     var COLS={date:ML,val:200,tag:300,status:420};
     var headerRow=function(){rect(ML,y-11,MRX-ML,17,[0,0,0]);text(COLS.date,y,'DATE','F2',7.2,WHITE);text(COLS.val,y,'MG/DL','F2',7.2,WHITE);text(COLS.tag,y,'TIME OF DAY','F2',7.2,WHITE);text(COLS.status,y,'STATUS','F2',7.2,WHITE);y+=12;};
     headerRow();
     var SN=['Below target','In range','Above target'],SC=[ORANGE,GREEN,RED];
-    list.forEach(function(r,idx){
+    p30.rows.forEach(function(r,idx){
       if(y>786){newPage();y=56;headerRow();}// row band ends at y+6; keep it 8pt above the footer line at 800
       if(idx%2===0)rect(ML,y-10.5,MRX-ML,16.5,ZEBRA);
       var d=new Date(r.ts),only=dateOnly(r);
@@ -122,7 +123,7 @@ function pdf(rows,now){
       if(st===null)text(COLS.status,y,'-','F1',9,FAINT);
       else{circle(COLS.status+3.2,y-3,2.8,SC[st]);text(COLS.status+10,y,SN[st],'F1',9,SC[st]);}
       y+=16.5;
-    });
+    });}
   }
   pages.forEach(function(p,i){
     ops=p;
