@@ -79,11 +79,6 @@ function pdf(rows,now){
       text(x+12,y+51,plural(pair[1].count,'reading'),'F1',8,GREY);
     });
     y+=76;
-    var lx=ML;
-    [['In range',GREEN],['Below target',ORANGE],['Above target',RED]].forEach(function(it){circle(lx+4,y-3.2,3.6,it[1]);text(lx+12,y,it[0],'F1',9,INK);lx+=12+tw(it[0],9)+22;});
-    y+=15;
-    text(ML,y,'Targets: morning '+MR.low+' to '+MR.high+' mg/dL. Afternoon and evening '+OR.low+' to '+OR.high+' mg/dL. Averages count all readings in those days.','F1',7.8,FAINT);
-    y+=24;
     var s30=series(list,30,now);
     var avgs=s30.map(function(d){return d.average;}).filter(function(a){return a!==null;});
     text(ML,y,'HOW YOUR DAILY AVERAGE MOVED (LAST 30 DAYS)','F2',8,FAINT);y+=13;
@@ -91,7 +86,7 @@ function pdf(rows,now){
       var lo=MR.low,hi=MR.high;
       avgs.forEach(function(a){lo=Math.min(lo,a);hi=Math.max(hi,a);});
       var y0=Math.max(0,Math.floor((lo-8)/20)*20),y1=Math.min(620,Math.ceil((hi+8)/20)*20);
-      var cx=66,cw2=MRX-cx,ch=165,cy=y;
+      var cx=66,cw2=MRX-cx,ch=124,cy=y;
       var vy=function(v){return cy+ch*(1-(v-y0)/(y1-y0));};
       rect(cx,vy(MR.high),cw2,vy(MR.low)-vy(MR.high),BAND);
       for(var g=y0;g<=y1;g+=20){hline(cx,MRX,vy(g),0.4,GRID);rtext(cx-6,vy(g)+2.5,String(g),'F1',8,FAINT);}
