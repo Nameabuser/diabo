@@ -117,7 +117,7 @@ function pdf(rows,now){
     headerRow();
     var SN=['Below target','In range','Above target'],SC=[ORANGE,GREEN,RED];
     list.forEach(function(r,idx){
-      if(y>760){newPage();y=56;headerRow();}
+      if(y>786){newPage();y=56;headerRow();}// row band ends at y+6; keep it 8pt above the footer line at 800
       if(idx%2===0)rect(ML,y-10.5,MRX-ML,16.5,ZEBRA);
       var d=new Date(r.ts),only=dateOnly(r);
       text(COLS.date,y,dShort(d),'F1',9,INK);
