@@ -115,7 +115,7 @@ function pdf(rows,now){
       if(y>786){newPage();y=56;headerRow();}// row band ends at y+6; keep it 8pt above the footer line at 800
       if(idx%2===0)rect(ML,y-10.5,MRX-ML,16.5,ZEBRA);
       var d=new Date(r.ts),only=dateOnly(r);
-      text(COLS.date,y,dShort(d),'F1',9,INK);
+      text(COLS.date,y,WD[d.getDay()],'F1',9,INK);rtext(COLS.date+32,y,String(d.getDate()),'F1',9,INK);text(COLS.date+36,y,MON[d.getMonth()],'F1',9,INK);
       text(COLS.val,y,String(r.value),'F2',9.5,INK);
       text(COLS.tag,y,label(r.tag)||'-','F1',9,INK);
       var st=statusOf(r);
